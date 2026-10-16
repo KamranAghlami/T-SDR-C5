@@ -6,6 +6,7 @@
 
 #include <esp_err.h>
 
+#include "board/battery.hpp"
 #include "board/lcd.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
@@ -23,9 +24,11 @@ namespace ui
         core::state state;
         bool new_line = false;
         bool radio_error = false;
-        uint8_t gain = 0;
+        uint8_t gain = 0; // PHY gain index in use
         uint16_t lines_per_s = 0;
         uint16_t captures = 0;
+        board::battery_status battery;
+        const char *version = nullptr; // static string
     };
 
     class renderer
@@ -52,6 +55,7 @@ namespace ui
         void status_row(int y, uint16_t *row) const;
         void spectrum_row(int y, uint16_t *row) const;
         void waterfall_row(int y, uint16_t *row) const;
+        void menu_row(int y, uint16_t *row) const;
         void build_axis();
         template <typename RowFn> void flush(RowFn &&row_fn);
         int level(uint8_t code, int scale) const;
@@ -69,6 +73,6 @@ namespace ui
         core::floor_tracker m_floor;
         frame m_last{};
         char m_status_left[24] = {};
-        char m_status_right[2][16] = {};
+        char m_status_right[2][24] = {};
     };
 }

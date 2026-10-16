@@ -7,7 +7,7 @@ if(NOT IDF_TARGET STREQUAL "esp32c5")
 endif()
 
 idf_component_register(
-    SRCS "c5_radio.c"
+    SRCS "c5_radio.c" "c5_engine.c"
          "${espsdr}/common/rx_recalibration.c"
          "${espsdr}/common/rx_calibration_state.c"
     INCLUDE_DIRS "include"

@@ -4,12 +4,15 @@
 #include <complex>
 #include <cstdio>
 #include <numbers>
+#include <string>
 #include <vector>
 
 #include "core/channels.hpp"
 #include "core/colormap.hpp"
 #include "core/fft.hpp"
+#include "core/gain.hpp"
 #include "core/gestures.hpp"
+#include "core/menu.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
 
@@ -266,6 +269,76 @@ namespace
         CHECK(run({{100, 200, true, false}, {400, 500, true, false}}, 1000) == std::vector<g>{g::short_a, g::short_a});
     }
 
+    void test_auto_level()
+    {
+        core::auto_level level;
+
+        // Clipping steps down at once, to zero at most.
+        CHECK(level.update(60, 80, 511) == 56);
+        CHECK(level.update(2, 80, 500) == 0);
+        // Mid-level signals hold the gain.
+        for (int i = 0; i < 200; i++)
+            CHECK(level.update(40, 80, 300) == 40);
+        // Quiet for release_lines lines: one release step, capped at max.
+        unsigned g = 40;
+
+        for (unsigned i = 0; i < core::auto_level::release_lines; i++)
+            g = level.update(g, 80, 50);
+
+        CHECK(g == 42);
+        CHECK(level.update(200, 80, 300) == 80);
+
+        // Quiet lines interrupted by a clip start over.
+        level.reset();
+        g = 40;
+
+        for (unsigned i = 0; i + 1 < core::auto_level::release_lines; i++)
+            g = level.update(g, 80, 50);
+
+        g = level.update(g, 80, 490);
+        CHECK(g == 36);
+
+        for (unsigned i = 0; i + 1 < core::auto_level::release_lines; i++)
+            g = level.update(g, 80, 50);
+
+        CHECK(g == 36);
+    }
+
+    void test_menu()
+    {
+        core::state s;
+        char value[24];
+
+        CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 80);
+        CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 20);
+
+        CHECK(s.gain == core::gain_auto);
+        core::menu_value(s, core::menu_item::gain, value, sizeof(value), nullptr);
+        CHECK(std::string(value) == "Auto");
+        core::menu_change(s, core::menu_item::gain, 20);
+        CHECK(s.gain == core::gain_agc);
+        core::menu_change(s, core::menu_item::gain, 20);
+        CHECK(s.gain == 8);
+        core::menu_change(s, core::menu_item::gain, 20);
+        CHECK(s.gain == 16);
+        core::menu_change(s, core::menu_item::gain, 20);
+        CHECK(s.gain == core::gain_auto);
+
+        s.brightness = 100;
+        core::menu_change(s, core::menu_item::brightness, 80);
+        CHECK(s.brightness == 20);
+        s.brightness = 55; // not a level: restart from the first
+        core::menu_change(s, core::menu_item::brightness, 80);
+        CHECK(s.brightness == 20);
+
+        CHECK(!core::menu_change(s, core::menu_item::about, 80));
+        core::menu_value(s, core::menu_item::about, value, sizeof(value), "v1.2.3");
+        CHECK(std::string(value) == "v1.2.3");
+
+        for (auto item : core::menu_items)
+            CHECK(core::menu_label(item)[0] != '\0');
+    }
+
     void test_colormap()
     {
         // Turbo is blue at a quarter and red at the top; values are byte-swapped RGB565.
@@ -287,6 +360,8 @@ int main()
     test_floor_tracker();
     test_channels();
     test_gestures();
+    test_auto_level();
+    test_menu();
     test_colormap();
 
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);

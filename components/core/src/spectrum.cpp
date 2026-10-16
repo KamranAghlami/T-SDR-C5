@@ -58,14 +58,17 @@ namespace core
         return window;
     }
 
-    void prepare_iq(const uint32_t *words, unsigned n, const int16_t *window, int16_t *out)
+    unsigned prepare_iq(const uint32_t *words, unsigned n, const int16_t *window, int16_t *out)
     {
-        int32_t sum_low = 0, sum_high = 0;
+        int32_t sum_low = 0, sum_high = 0, peak = 0;
 
         for (unsigned j = 0; j < n; j++)
         {
-            sum_low += field(words[j], 0);
-            sum_high += field(words[j], 10);
+            const int32_t low = field(words[j], 0), high = field(words[j], 10);
+
+            sum_low += low;
+            sum_high += high;
+            peak = std::max({peak, low < 0 ? -low : low, high < 0 ? -high : high});
         }
 
         const int32_t half = static_cast<int32_t>(n / 2);
@@ -80,6 +83,8 @@ namespace core
             out[2 * j] = sat(((field(words[j], 0) - mean_low) * w) >> 9);
             out[2 * j + 1] = sat(((mean_high - field(words[j], 10)) * w) >> 9);
         }
+
+        return static_cast<unsigned>(peak);
     }
 
     void line_accumulator::configure(unsigned n_fft, unsigned bins)

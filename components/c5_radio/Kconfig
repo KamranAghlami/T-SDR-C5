@@ -1,0 +1,11 @@
+menu "t-sdr-c5 radio"
+
+    config C5_RADIO_STOCK_CAPTURE
+        bool "Use the vendor adctrig() capture path"
+        default n
+        help
+            Capture through the stock RF test routine, as ESP-SDR does. It adds
+            about 1.7 ms per snapshot. The default register-level engine
+            (ported from ESPsoup) produces the same samples without that stall.
+
+endmenu

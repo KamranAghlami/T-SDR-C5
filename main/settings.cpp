@@ -2,6 +2,7 @@
 #include "settings.hpp"
 
 #include <algorithm>
+#include <cstddef>
 
 #include <nvs.h>
 
@@ -11,9 +12,10 @@ namespace settings
     {
         constexpr const char *nvs_namespace = "t-sdr-c5";
         constexpr const char *nvs_key = "state";
-        constexpr uint8_t layout_version = 1;
+        constexpr uint8_t layout_version = 2;
 
-        // Stable on-flash layout, independent of core::state.
+        // Stable on-flash layout, independent of core::state. Version 1 had
+        // no gain byte; newer fields are only ever appended.
         struct stored
         {
             uint8_t version;
@@ -23,7 +25,10 @@ namespace settings
             uint8_t detector;
             uint8_t colormap;
             uint8_t brightness;
+            uint8_t gain;
         };
+
+        constexpr size_t v1_size = offsetof(stored, gain);
     }
 
     core::state load()
@@ -36,8 +41,8 @@ namespace settings
 
         stored s{};
         size_t size = sizeof(s);
-        const bool ok = nvs_get_blob(handle, nvs_key, &s, &size) == ESP_OK && size == sizeof(s) &&
-                        s.version == layout_version;
+        const bool ok = nvs_get_blob(handle, nvs_key, &s, &size) == ESP_OK &&
+                        ((s.version == layout_version && size == sizeof(s)) || (s.version == 1 && size == v1_size));
 
         nvs_close(handle);
 
@@ -57,6 +62,9 @@ namespace settings
         state.colormap = s.colormap ? core::colormap_id::grayscale : core::colormap_id::turbo;
         state.brightness = std::clamp<uint8_t>(s.brightness, 10, 100);
 
+        if (s.version >= 2)
+            state.gain = s.gain;
+
         return state;
     }
 
@@ -70,6 +78,7 @@ namespace settings
             .detector = static_cast<uint8_t>(state.detector),
             .colormap = static_cast<uint8_t>(state.colormap),
             .brightness = state.brightness,
+            .gain = state.gain,
         };
         nvs_handle_t handle;
 

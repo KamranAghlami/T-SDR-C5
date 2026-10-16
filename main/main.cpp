@@ -10,10 +10,13 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
+#include "board/battery.hpp"
 #include "board/buttons.hpp"
 #include "board/lcd.hpp"
 #include "c5_radio.h"
 #include "core/fft.hpp"
+#include "core/gain.hpp"
+#include "core/menu.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
 #include "settings.hpp"
@@ -23,14 +26,17 @@ namespace
 {
     constexpr const char *tag = "t-sdr-c5";
     constexpr int64_t line_period_us = 40'000; // 25 waterfall lines per second
-    constexpr int64_t frozen_refresh_us = 200'000;
+    constexpr int64_t idle_refresh_us = 200'000;
     constexpr int64_t save_delay_us = 2'000'000;
+    constexpr TickType_t battery_period = pdMS_TO_TICKS(5000);
 
     board::lcd lcd;
     board::buttons buttons;
+    board::battery battery;
     ui::renderer renderer;
     QueueHandle_t gestures;
     QueueHandle_t frames;
+    QueueHandle_t battery_status; // length 1, overwritten
 
     void ui_task(void *)
     {
@@ -41,16 +47,65 @@ namespace
                 renderer.show(f);
     }
 
-    struct control
+    void battery_task(void *)
+    {
+        for (;;)
+        {
+            const board::battery_status status = battery.read();
+
+            xQueueOverwrite(battery_status, &status);
+            vTaskDelay(battery_period);
+        }
+    }
+
+    struct effects
     {
         bool retune = false;
         bool respan = false;
-        bool changed = false;
+        bool regain = false;
+        bool brightness = false;
+        bool save = false;
     };
 
-    control apply(core::gesture g, core::state &state)
+    effects apply(core::gesture g, core::state &state)
     {
-        control c;
+        effects e;
+
+        if (state.menu_open)
+        {
+            switch (g)
+            {
+            case core::gesture::short_a:
+                state.menu_index = static_cast<uint8_t>((state.menu_index + 1) % core::menu_items.size());
+                break;
+
+            case core::gesture::short_b:
+            {
+                const auto item = core::menu_items[state.menu_index];
+
+                if (core::menu_change(state, item, c5_radio_gain_max()))
+                {
+                    e.save = true;
+                    e.respan = item == core::menu_item::span;
+                    e.regain = item == core::menu_item::gain;
+                    e.brightness = item == core::menu_item::brightness;
+                }
+                break;
+            }
+
+            case core::gesture::long_a:
+            case core::gesture::long_b:
+            case core::gesture::both:
+                state.menu_open = false;
+                break;
+
+            case core::gesture::none:
+                break;
+            }
+
+            return e;
+        }
+
         auto &index = state.channel_index[static_cast<unsigned>(state.band)];
 
         switch (g)
@@ -59,55 +114,71 @@ namespace
         case core::gesture::short_b:
             index = static_cast<uint8_t>(core::step_channel(state.band, index, g == core::gesture::short_a ? -1 : 1));
             state.frozen = false;
-            c.retune = true;
+            e.retune = e.save = true;
             break;
 
         case core::gesture::long_a:
             state.band = core::other(state.band);
             state.frozen = false;
-            c.retune = true;
+            e.retune = e.save = true;
             break;
 
         case core::gesture::long_b:
-        {
-            // Until the settings menu lands (M3): cycle the span.
-            auto it = std::ranges::find(core::spans_mhz, state.span_mhz);
-
-            state.span_mhz = (it == core::spans_mhz.end() || ++it == core::spans_mhz.end()) ? core::spans_mhz[0] : *it;
-            c.respan = true;
+            state.menu_open = true;
+            state.menu_index = 0;
             break;
-        }
 
         case core::gesture::both:
             state.frozen = !state.frozen;
             break;
 
         case core::gesture::none:
-            return c;
+            break;
         }
 
-        c.changed = true;
-
-        return c;
+        return e;
     }
 
-    void radio_loop()
+    // Applies the gain setting; returns the (clamped) auto-level index.
+    unsigned apply_gain(const core::state &state, unsigned auto_index)
+    {
+        const unsigned max_gain = c5_radio_gain_max();
+
+        auto_index = std::min(auto_index, max_gain);
+
+        if (state.gain == core::gain_agc)
+            c5_radio_gain_hardware();
+        else if (state.gain == core::gain_auto)
+            c5_radio_gain_manual(auto_index);
+        else
+            c5_radio_gain_manual(std::min<unsigned>(state.gain, max_gain));
+
+        return auto_index;
+    }
+
+    void radio_loop(const char *version)
     {
         core::state state = settings::load();
         const core::fft_q15 fft(core::fft_log2);
         const auto window = core::hann_q15(core::fft_size);
         auto *samples = static_cast<int16_t *>(heap_caps_malloc(core::fft_size * 4, MALLOC_CAP_INTERNAL));
         core::line_accumulator accumulator;
+        core::auto_level leveller;
         static ui::frame f;
 
         assert(samples);
         accumulator.configure(core::fft_size, core::span_bins(state.span_mhz));
         lcd.set_backlight(state.brightness);
+        f.version = version;
 
+        unsigned auto_gain = c5_radio_gain_max() * 3 / 4;
         bool retune = true;
         int64_t next_line = 0, save_at = 0, rate_start = esp_timer_get_time(), last_frame = 0;
-        unsigned lines = 0, errors = 0;
+        unsigned lines = 0, line_peak = 0, second_peak = 0;
         uint8_t gain = 0;
+        c5_radio_stats_t last_stats;
+
+        c5_radio_get_stats(&last_stats);
 
         for (;;)
         {
@@ -115,18 +186,26 @@ namespace
 
             while (xQueueReceive(gestures, &g, 0) == pdTRUE)
             {
-                const control c = apply(g, state);
+                const effects e = apply(g, state);
 
-                retune |= c.retune;
+                retune |= e.retune;
 
-                if (c.respan)
+                if (e.respan)
                     accumulator.configure(core::fft_size, core::span_bins(state.span_mhz));
 
-                if (c.changed)
+                if (e.regain)
                 {
-                    save_at = esp_timer_get_time() + save_delay_us;
-                    last_frame = 0; // show the change right away
+                    leveller.reset();
+                    auto_gain = apply_gain(state, auto_gain);
                 }
+
+                if (e.brightness)
+                    lcd.set_backlight(state.brightness);
+
+                if (e.save)
+                    save_at = esp_timer_get_time() + save_delay_us;
+
+                last_frame = 0; // show the change right away
             }
 
             if (retune)
@@ -136,7 +215,11 @@ namespace
                 if (c5_radio_tune(mhz) != ESP_OK)
                     ESP_LOGW(tag, "tune %u MHz failed", mhz);
 
+                // Retuning reprograms the receiver; restore the gain setting.
+                leveller.reset();
+                auto_gain = apply_gain(state, auto_gain);
                 accumulator.reset();
+                line_peak = 0;
                 retune = false;
                 next_line = esp_timer_get_time() + line_period_us;
             }
@@ -149,9 +232,11 @@ namespace
                 save_at = 0;
             }
 
+            xQueuePeek(battery_status, &f.battery, 0);
+
             if (state.frozen)
             {
-                if (now - last_frame >= frozen_refresh_us)
+                if (now - last_frame >= idle_refresh_us)
                 {
                     f.state = state;
                     f.new_line = false;
@@ -168,13 +253,9 @@ namespace
             if (c5_radio_capture(core::fft_size, C5_RATE_80M, &words, nullptr) == ESP_OK)
             {
                 gain = static_cast<uint8_t>((words[0] >> 20) & 0x7f);
-                core::prepare_iq(words, core::fft_size, window.data(), samples);
+                line_peak = std::max(line_peak, core::prepare_iq(words, core::fft_size, window.data(), samples));
                 fft.forward(samples);
                 accumulator.add(samples);
-            }
-            else
-            {
-                errors++;
             }
 
             now = esp_timer_get_time();
@@ -192,13 +273,33 @@ namespace
             last_frame = now;
             lines++;
 
+            if (state.gain == core::gain_auto)
+            {
+                const unsigned next = leveller.update(auto_gain, c5_radio_gain_max(), line_peak);
+
+                if (next != auto_gain)
+                {
+                    auto_gain = next;
+                    c5_radio_gain_manual(auto_gain);
+                }
+            }
+
+            second_peak = std::max(second_peak, line_peak);
+            line_peak = 0;
+
             if (now - rate_start >= 1'000'000)
             {
+                c5_radio_stats_t stats;
+
+                c5_radio_get_stats(&stats);
                 f.lines_per_s = static_cast<uint16_t>(lines);
-                ESP_LOGI(tag, "%u lines/s, %u captures/line, %u errors, gain %u, free SRAM %u", lines, f.captures, errors,
-                         gain, static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+                ESP_LOGI(tag, "%u lines/s, %u captures/line, %u failures, %u recalibrations, gain %u, peak %u, SRAM %u",
+                         lines, f.captures, static_cast<unsigned>(stats.failures - last_stats.failures),
+                         static_cast<unsigned>(stats.recalibrations - last_stats.recalibrations), gain, second_peak,
+                         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+                last_stats = stats;
                 lines = 0;
-                errors = 0;
+                second_peak = 0;
                 rate_start = now;
             }
 
@@ -207,7 +308,7 @@ namespace
             if (next_line < now)
                 next_line = now + line_period_us;
 
-            // Let lower-priority tasks (idle, logging) run once per line.
+            // Let lower-priority tasks (idle, logging, battery) run once per line.
             vTaskDelay(1);
         }
     }
@@ -217,15 +318,27 @@ extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(lcd.init());
     ESP_ERROR_CHECK(renderer.init(lcd));
-
     renderer.clear();
-    ESP_LOGI(tag, "t-sdr-c5 %s", esp_app_get_description()->version);
-    // The vendor capture routine logs every snapshot; that also slows it down.
+
+    const char *version = esp_app_get_description()->version;
+
+    ESP_LOGI(tag, "t-sdr-c5 %s", version);
+    // The vendor PHY code logs per capture/retune; that also costs time.
     esp_log_level_set("phy", ESP_LOG_WARN);
 
     gestures = xQueueCreate(8, sizeof(core::gesture));
     frames = xQueueCreate(2, sizeof(ui::frame));
+    battery_status = xQueueCreate(1, sizeof(board::battery_status));
     ESP_ERROR_CHECK(buttons.init(gestures));
+
+    const board::battery_status none;
+
+    xQueueOverwrite(battery_status, &none);
+
+    if (battery.init() == ESP_OK)
+        xTaskCreate(battery_task, "battery", 3072, nullptr, 2, nullptr);
+    else
+        ESP_LOGW(tag, "no AXP2602 fuel gauge found");
 
     // Also initialises NVS, which settings::load() needs.
     ESP_ERROR_CHECK(c5_radio_init());
@@ -235,5 +348,5 @@ extern "C" void app_main(void)
     // refill the next display band as soon as a transfer finishes.
     xTaskCreate(ui_task, "ui", 6144, nullptr, 5, nullptr);
     vTaskPrioritySet(nullptr, 4);
-    radio_loop();
+    radio_loop(version);
 }

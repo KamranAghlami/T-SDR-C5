@@ -9,7 +9,9 @@ set(core "${CMAKE_CURRENT_LIST_DIR}/../../components/core")
 add_executable(core_tests
     core_tests.cpp
     "${core}/src/fft.cpp"
+    "${core}/src/gain.cpp"
     "${core}/src/gestures.cpp"
+    "${core}/src/menu.cpp"
     "${core}/src/spectrum.cpp")
 target_include_directories(core_tests PRIVATE "${core}/include")
 target_compile_options(core_tests PRIVATE -Wall -Wextra -Werror -fsanitize=address,undefined)

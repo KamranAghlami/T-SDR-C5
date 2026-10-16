@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "core/channels.hpp"
+#include "core/gain.hpp"
 #include "core/spectrum.hpp"
 
 namespace core
@@ -36,7 +37,12 @@ namespace core
         core::detector detector = core::detector::peak;
         core::colormap_id colormap = core::colormap_id::turbo;
         uint8_t brightness = 80;
+        uint8_t gain = gain_auto; // gain_auto, gain_agc or a manual index
+
+        // Not persisted.
         bool frozen = false;
+        bool menu_open = false;
+        uint8_t menu_index = 0;
 
         const core::channel &current_channel() const
         {

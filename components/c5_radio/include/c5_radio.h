@@ -40,10 +40,19 @@ unsigned c5_radio_gain_max(void);
 /* Approximate two-sided analog bandwidth in MHz (11..48); 0 = widest. */
 esp_err_t c5_radio_bandwidth(unsigned mhz);
 
+typedef struct {
+    uint32_t captures;       /* successful snapshots */
+    uint32_t failures;       /* timeouts and overruns */
+    uint32_t recalibrations; /* RX DC measurements */
+} c5_radio_stats_t;
+
 /* Snapshot of n complex samples. On success *words points to n IQ10 words
  * that stay valid until the next capture: I in bits 0..9, Q in bits 10..19
  * (signed), PHY gain index in bits 20..26 of words[0]. */
 esp_err_t c5_radio_capture(unsigned n, c5_rate_t rate, const uint32_t **words, uint32_t *elapsed_us);
+
+/* Cumulative counters since boot. */
+void c5_radio_get_stats(c5_radio_stats_t *stats);
 
 #ifdef __cplusplus
 }

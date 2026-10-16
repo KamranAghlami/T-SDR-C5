@@ -9,6 +9,7 @@
 
 #include "core/colormap.hpp"
 #include "core/font5x7.hpp"
+#include "core/menu.hpp"
 
 namespace ui
 {
@@ -27,6 +28,9 @@ namespace ui
         constexpr uint16_t hold = core::rgb565(255, 210, 0);
         constexpr uint16_t axis_bg = core::rgb565(18, 18, 18);
         constexpr uint16_t channel_bar = core::rgb565(0, 160, 200);
+        constexpr uint16_t menu_bg = core::rgb565(10, 14, 24);
+        constexpr uint16_t menu_selected = core::rgb565(0, 70, 120);
+        constexpr int menu_row_h = 16;
 
         // Draws row `gy` (0 = top) of `text` at scale `scale` into a pixel row.
         void text_row(uint16_t *row, int gy, int x, const char *text, int scale, uint16_t colour)
@@ -149,7 +153,14 @@ namespace ui
                       channel.mhz);
         std::snprintf(m_status_right[0], sizeof(m_status_right[0]), "%uMHz %s", f.state.span_mhz,
                       f.state.frozen ? "FROZEN" : f.state.detector == core::detector::peak ? "PEAK" : "MEAN");
-        std::snprintf(m_status_right[1], sizeof(m_status_right[1]), "%u/s G%u", f.lines_per_s, f.gain);
+        const char gain_mode = f.state.gain == core::gain_auto ? 'A' : f.state.gain == core::gain_agc ? 'H' : 'G';
+        char battery[8] = "";
+
+        if (f.battery.present)
+            std::snprintf(battery, sizeof(battery), " %u%%%s", f.battery.percent, f.battery.charging ? "+" : "");
+
+        std::snprintf(m_status_right[1], sizeof(m_status_right[1]), "%u/s %c%u%s", f.lines_per_s, gain_mode, f.gain,
+                      battery);
 
         m_last = f;
         flush([this](int y, uint16_t *row) { render_row(y, row); });
@@ -163,8 +174,32 @@ namespace ui
             spectrum_row(y - spectrum_y, row);
         else if (y < waterfall_y)
             std::memcpy(row, m_axis + (y - axis_y) * width, width * 2);
+        else if (m_last.state.menu_open)
+            menu_row(y - waterfall_y, row);
         else
             waterfall_row(y - waterfall_y, row);
+    }
+
+    // Menu over the waterfall: one item per 16-pixel row, value right-aligned.
+    void renderer::menu_row(int y, uint16_t *row) const
+    {
+        const int index = y / menu_row_h;
+        const bool selected = index == m_last.state.menu_index;
+
+        std::fill(row, row + width, selected ? menu_selected : menu_bg);
+
+        if (index >= static_cast<int>(core::menu_items.size()))
+            return;
+
+        const auto item = core::menu_items[index];
+        char value[24];
+
+        core::menu_value(m_last.state, item, value, sizeof(value), m_last.version);
+        text_row(row, y % menu_row_h - 1, 6, core::menu_label(item), 2, selected ? white : grey);
+        // Long values (the version string) drop to the small font.
+        const int scale = text_width(value, 2) > width - 96 ? 1 : 2;
+
+        text_row(row, y % menu_row_h - (scale == 2 ? 1 : 4), width - 6 - text_width(value, scale), value, scale, white);
     }
 
     void renderer::status_row(int y, uint16_t *row) const

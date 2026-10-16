@@ -22,8 +22,9 @@ namespace core
     // Converts n IQ10 dump words (bits 0..9 and 10..19, signed) into windowed
     // interleaved Q15 complex samples with the mean (DC/LO leakage) removed.
     // The dump delivers LO - RF, so the second field is negated: positive
-    // frequency offsets then land above the centre, as on the air.
-    void prepare_iq(const uint32_t *words, unsigned n, const int16_t *window, int16_t *out);
+    // frequency offsets then land above the centre, as on the air. Returns
+    // the largest |sample| before DC removal (0..512), for gain control.
+    unsigned prepare_iq(const uint32_t *words, unsigned n, const int16_t *window, int16_t *out);
 
     // Collects FFT power spectra for one waterfall line and reduces them to
     // display pixels.
