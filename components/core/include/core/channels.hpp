@@ -19,7 +19,8 @@ namespace core
         uint16_t mhz;
     };
 
-    // 20 MHz Wi-Fi channel centres the ESP32-C5 radio can tune to.
+    // 20 MHz Wi-Fi channel centres. The UI tunes by frequency; this table only
+    // converts settings saved by versions that stored a channel index.
     inline constexpr std::array<channel, 14> channels_24 = {{
         {1, 2412}, {2, 2417}, {3, 2422}, {4, 2427}, {5, 2432}, {6, 2437}, {7, 2442},
         {8, 2447}, {9, 2452}, {10, 2457}, {11, 2462}, {12, 2467}, {13, 2472}, {14, 2484},

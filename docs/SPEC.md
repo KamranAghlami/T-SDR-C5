@@ -279,3 +279,5 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | D3 | USB host mode (ESPARGOS viewer compatible) | **Dropped** (2026-10-16): anyone who wants a USB SDR can flash ESP-SDR itself |
 | D4 | Language | **C++23 app/UI/DSP, C radio layer** |
 | D5 | Default view | Channel view, 80 MS/s capture, 40 MHz displayed span, peak detector |
+| D6 | Tuning (2026-10-16) | **By frequency, not Wi-Fi channel**: ranges 2130–2730 / 4790–5990 MHz (ESPsoup's exact-tuning limits), Step 1/5/10/20 MHz in the menu; band view = whole range, cursor moves by the step; settings v4 migrates saved channels |
+| D7 | Band survey | Menu item View (A+B stays freeze); stitched 40 MHz steps, passband shape learned from the quietest step per offset and removed; centre bins blanked |

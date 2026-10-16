@@ -28,6 +28,8 @@ namespace core
             return "View";
         case menu_item::span:
             return "Span";
+        case menu_item::step:
+            return "Step";
         case menu_item::detector:
             return "Detector";
         case menu_item::gain:
@@ -57,6 +59,10 @@ namespace core
                 return false;
 
             s.span_mhz = next_in(spans_mhz, s.span_mhz);
+            return true;
+
+        case menu_item::step:
+            s.step_mhz = next_in(steps_mhz, s.step_mhz);
             return true;
 
         case menu_item::detector:
@@ -103,6 +109,10 @@ namespace core
                 std::snprintf(out, size, "Whole band");
             else
                 std::snprintf(out, size, "%u MHz", s.span_mhz);
+            break;
+
+        case menu_item::step:
+            std::snprintf(out, size, "%u MHz", s.step_mhz);
             break;
 
         case menu_item::detector:

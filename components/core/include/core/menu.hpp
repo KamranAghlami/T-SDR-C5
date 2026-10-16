@@ -13,6 +13,7 @@ namespace core
     {
         view,
         span,
+        step,
         detector,
         gain,
         colormap,
@@ -20,9 +21,9 @@ namespace core
         about,
     };
 
-    inline constexpr std::array<menu_item, 7> menu_items = {
-        menu_item::view,     menu_item::span,       menu_item::detector, menu_item::gain,
-        menu_item::colormap, menu_item::brightness, menu_item::about,
+    inline constexpr std::array<menu_item, 8> menu_items = {
+        menu_item::view, menu_item::span,     menu_item::step,       menu_item::detector,
+        menu_item::gain, menu_item::colormap, menu_item::brightness, menu_item::about,
     };
 
     inline constexpr std::array<uint8_t, 5> brightness_levels = {20, 40, 60, 80, 100};

@@ -5,7 +5,8 @@
 The ESP32-C5 has a dual-band (2.4 + 5 GHz) Wi-Fi radio. ESP-SDR found an
 undocumented debug path that delivers its raw I/Q samples to the CPU.
 t-sdr-c5 runs FFTs on the chip itself and draws a live spectrum and waterfall
-of any 2.4 or 5 GHz Wi-Fi channel on the board's 1.9" screen. It needs no PC,
+anywhere from 2130 to 2730 MHz and from 4790 to 5990 MHz on the board's 1.9" screen:
+Wi-Fi, the 13 cm amateur band, 5.8 GHz FPV video and more. It needs no PC,
 no SDR dongle and no extra hardware: just the board and its antenna.
 
 [![CI](https://github.com/KamranAghlami/t-sdr-c5/actions/workflows/ci.yml/badge.svg)](https://github.com/KamranAghlami/t-sdr-c5/actions/workflows/ci.yml)
@@ -14,23 +15,26 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-0a6fd6)](https://kamranaghlami.github.io/t-sdr-c5/)
 
 > **Status:** [v0.2.0](https://github.com/KamranAghlami/t-sdr-c5/releases/latest) is the full channel
-> view: fast capture, upper-5 GHz tuning, auto-level gain, settings menu and battery, all verified on
-> hardware. Flash it [from the browser](https://kamranaghlami.github.io/t-sdr-c5/). A band-survey view is
+> view (fast capture, upper-5 GHz tuning, auto-level gain, settings menu, battery), verified on
+> hardware. `main` adds the band survey and tuning by frequency. Flash it [from the browser](https://kamranaghlami.github.io/t-sdr-c5/). A band-survey view is
 > next; see [the milestones](docs/SPEC.md#9-milestones).
 
 ## Features
 
-- Live **spectrum + waterfall** of the selected Wi-Fi channel, about 25 lines per second.
-- **2.4 GHz** channels 1–14 and **5 GHz** channels 36–177, switched with the two buttons.
+- Live **spectrum + waterfall** around any frequency, about 25 lines per second.
+- Two ranges, **2130–2730 MHz** and **4790–5990 MHz** (the chip's measured exact-tuning limits),
+  tuned in 1 / 5 / 10 / 20 MHz steps with the two buttons.
+- **Band survey:** a whole range in one waterfall, swept in 40 MHz steps with the receiver's passband
+  shape learned and removed, so the floor stays flat.
 - 80 MS/s capture with a 1024-point FFT (78 kHz bins). Selectable 20 / 40 / 80 MHz span,
-  so you can see the overlapping 2.4 GHz neighbours.
+  so you can see neighbouring Wi-Fi channels overlap.
 - Peak-hold detector by default (the right choice for bursty Wi-Fi), with a mean detector and a decaying
   peak trace on the spectrum.
 - Automatic noise-floor tracking with a 40 dB display range, and turbo or grey colour maps.
 - **Auto-level gain:** a fixed gain just below clipping, so the waterfall doesn't pump the way the
   chip's hardware AGC does on every packet. Hardware AGC or a manual gain are also available.
 - Settings menu (span, detector, gain, colours, brightness, version), battery percentage.
-- Remembers band, channel per band and all settings across power cycles.
+- Remembers the range, the frequency per range and all settings across power cycles.
 
 Want the board as a USB SDR for a PC instead? Flash [ESP-SDR](https://github.com/ESPARGOS/esp-sdr)
 itself and use its browser viewer. t-sdr-c5 is the standalone counterpart.
@@ -73,9 +77,9 @@ Button **A** is the one labelled `USER` (IO0); button **B** is `BOOT` (IO28):
 
 | Press | Action |
 |---|---|
-| **A** short | previous channel (wraps around) |
-| **B** short | next channel (wraps around) |
-| **A** long (0.7 s) | switch band 2.4 ↔ 5 GHz; each band remembers its channel |
+| **A** short | tune down by the step (wraps at the range edge); in the band view, move the cursor |
+| **B** short | tune up by the step; in the band view, move the cursor |
+| **A** long (0.7 s) | switch range 2.4 ↔ 5 GHz; each range remembers its frequency |
 | **B** long (0.7 s) | open the settings menu |
 | **A + B** | freeze / unfreeze the picture |
 
@@ -85,7 +89,9 @@ automatically.
 
 | Item | Values |
 |---|---|
+| View | Channel (around one frequency) / Band (the whole range) |
 | Span | 20 / 40 / 80 MHz |
+| Step | 1 / 5 (default) / 10 / 20 MHz per press |
 | Detector | Peak (default) / Mean |
 | Gain | Auto (auto-level) / HW AGC / manual 8, 16, … |
 | Colours | Turbo / Grey |
@@ -97,9 +103,17 @@ automatically.
 Each waterfall line is built from about 40 short snapshots of the radio (12.8 µs each) taken
 during its 40 ms. Most settings change how those snapshots turn into pixels.
 
-**Span: 20 / 40 / 80 MHz.** How much spectrum the 320-pixel width covers, centred on the channel.
-- **20 MHz** is exactly one Wi-Fi channel, at the finest detail (62.5 kHz per pixel).
-- **40 MHz** (default) shows the channel plus 10 MHz on each side. In 2.4 GHz, where channels
+**View: Channel / Band.** *Channel* shows the span around the tuned frequency in detail. *Band*
+sweeps the whole range in 40 MHz steps and stitches them into one line: 15 steps for 2130–2730 MHz,
+30 for 4790–5990 MHz, at about 20 lines/s. The bar on the band view's axis marks what the channel
+view would show; switch back to *Channel* to look there in detail. Every 40 MHz capture passes noise
+more strongly at its centre than at its edges. The band view learns that shape from the quietest steps
+and divides it out, so for about a second after switching ranges the floor can look uneven.
+
+**Span: 20 / 40 / 80 MHz.** How much spectrum the 320-pixel width covers, centred on the tuned
+frequency.
+- **20 MHz** is exactly one Wi-Fi channel's width, at the finest detail (62.5 kHz per pixel).
+- **40 MHz** (default) adds 10 MHz on each side. In 2.4 GHz Wi-Fi, where channels
   overlap, you see the neighbours bleeding in.
 - **80 MHz** shows everything the radio captures. Beyond about ±24 MHz the radio's own analog filter
   rolls off, so signals near the edges look weaker than they are.
@@ -114,6 +128,9 @@ during its 40 ms. Most settings change how those snapshots turn into pixels.
 - The spectrum plot above the waterfall always shows both: the cyan trace is the mean, the yellow
   dots a slowly decaying peak hold. The detector only affects the waterfall.
 
+**Step: 1 / 5 / 10 / 20 MHz.** How far one short press of A or B tunes (or moves the band view's
+cursor). 5 MHz is the Wi-Fi channel raster in 2.4 GHz; 20 MHz moves a whole 5 GHz channel.
+
 **Gain: Auto / HW AGC / manual.** How much the receiver amplifies before its 10-bit ADC. Too much
 and strong signals clip (the waterfall smears, false signals appear); too little and weak signals
 sink into the noise. The number is the chip's gain-table index, not dB; higher means more gain.
@@ -124,7 +141,7 @@ The status bar shows the mode letter and the index in use, for example `A26`.
 - **HW AGC** (`H`) hands control to the chip's own Wi-Fi AGC, which changes the gain inside each
   packet, as a Wi-Fi modem needs. Snapshots then get different gains, so levels jump from line to
   line and the waterfall flickers. It's mostly there for comparison.
-- **Manual 8, 16, …** (`G`) holds one gain for good. Use it to compare channels or places under the
+- **Manual 8, 16, …** (`G`) holds one gain for good. Use it to compare frequencies or places under the
   same receiver conditions, since Auto might pick a different gain at each.
 
 **Colours: Turbo / Grey.** The waterfall palette. Turbo runs blue → green → yellow → red for maximum
@@ -137,12 +154,12 @@ about 40 dB above it. The floor is tracked automatically, so these are relative 
 
 ```
 ┌──────────────────────────────────────────────┐
-│ 2.4G CH6 2437                  40MHz PEAK    │  band, channel, centre MHz | span, detector
+│ 2.4G 2437 MHz                  40MHz PEAK    │  range, tuned frequency | span (BAND), detector
 │                            25/s A42 87%      │  lines/s, gain (A=auto H=HW AGC G=manual), power
 ├──────────────────────────────────────────────┤
 │  live spectrum: mean (cyan) + peak hold      │  10 dB grid lines
 ├──────────────────────────────────────────────┤
-│ ▔▔▔▔▔▔ 2430  2440  2450                       │  selected 20 MHz channel, MHz labels
+│ ▔▔▔▔▔▔ 2430  2440  2450                       │  20 MHz around the centre (band view: the span), MHz
 ├──────────────────────────────────────────────┤
 │  waterfall, newest line at the top           │  ≈4 s of history
 └──────────────────────────────────────────────┘
@@ -181,13 +198,14 @@ flowchart LR
 ## Limitations
 
 - **It samples; it isn't gapless.** Each 40 ms line looks at well under 1 ms of RF.
-  Busy channels and beacons show up clearly, but a single short burst can be missed.
+  Busy Wi-Fi channels and beacons show up clearly, but a single short burst can be missed.
 - Levels are uncalibrated dB. Expect a small residual spike at the centre (zero-IF DC/LO
   leakage, mostly removed) and faint mirror images of very strong signals.
 - The passband is flat to about ±20 MHz. In the 80 MHz span, the edges are attenuated.
 - 5 GHz uses the Wi-Fi driver's PLL path (as measured by ESPsoup) to stay sensitive above
   5745 MHz. Individual boards can still have dead spots.
-- No reception below about 2.1 GHz on this chip.
+- No reception below about 2.1 GHz on this chip; the ranges stop at the measured exact-tuning limits
+  (ESPsoup's boards). Individual boards can differ near the ends.
 - Receive-only, but not RF-silent: the stock PHY start-up and background calibration
   can emit short internal calibration signals, as on any ESP32 Wi-Fi firmware.
 
@@ -222,7 +240,7 @@ Layout: `components/c5_radio` (C, the ESP-SDR-derived receive path), `components
 - [ESPARGOS/esp-sdr](https://github.com/ESPARGOS/esp-sdr) by Florian Euchner, Zoltan Doczi
   and contributors: the raw I/Q capture method and the ESP32-C5 receiver this project builds on.
 - [pit711/espsoup-firmware](https://github.com/pit711/espsoup-firmware): C5 measurements behind
-  the upcoming fast capture engine and 5 GHz tuning path.
+  the fast capture engine, the 5 GHz tuning path and the tuning limits.
 - [z1000biker/esp32c3rxtx](https://github.com/z1000biker/esp32c3rxtx), [cyber-murmel/esp-sdr-zephyr](https://github.com/cyber-murmel/esp-sdr-zephyr),
   [Twotoz/C5VRX](https://github.com/Twotoz/C5VRX): ideas and hardware findings.
 - [LilyGO](https://github.com/Xinyuan-LilyGO/T-Display-C5) for the board and its pin map.

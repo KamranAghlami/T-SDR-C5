@@ -116,18 +116,22 @@ namespace
             return e;
         }
 
-        auto &index = state.channel_index[static_cast<unsigned>(state.band)];
+        auto &mhz = state.frequency_mhz[static_cast<unsigned>(state.band)];
 
         switch (g)
         {
         case core::gesture::short_a:
         case core::gesture::short_b:
-            index = static_cast<uint8_t>(core::step_channel(state.band, index, g == core::gesture::short_a ? -1 : 1));
+        {
+            const int step = state.step_mhz;
+
+            mhz = static_cast<uint16_t>(core::step_frequency(state.band, mhz, g == core::gesture::short_a ? -step : step));
             state.frozen = false;
             // In the band view this only moves the cursor; the sweep is unchanged.
             e.retune = state.view == core::view_id::channel;
             e.save = true;
             break;
+        }
 
         case core::gesture::long_a:
             state.band = core::other(state.band);
@@ -234,7 +238,7 @@ namespace
                 }
                 else
                 {
-                    const unsigned mhz = state.current_channel().mhz;
+                    const unsigned mhz = state.current_mhz();
 
                     if (c5_radio_tune(mhz) != ESP_OK)
                         ESP_LOGW(tag, "tune %u MHz failed", mhz);

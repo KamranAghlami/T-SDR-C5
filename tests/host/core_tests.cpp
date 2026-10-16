@@ -325,16 +325,26 @@ namespace
         CHECK(core::channels(core::band::ghz5).front().mhz == 5180);
         CHECK(core::channels(core::band::ghz5).back().mhz == 5885);
         CHECK(core::channels_5[20].number == 149 && core::channels_5[20].mhz == 5745);
-        CHECK(core::step_channel(core::band::ghz24, 0, -1) == 13);
-        CHECK(core::step_channel(core::band::ghz24, 13, 1) == 0);
-        CHECK(core::step_channel(core::band::ghz5, 27, 1) == 0);
-        CHECK(core::step_channel(core::band::ghz5, 3, 2) == 5);
 
         core::state s;
 
-        CHECK(s.current_channel().number == 6);
+        CHECK(s.current_mhz() == 2437);
         s.band = core::band::ghz5;
-        CHECK(s.current_channel().number == 36);
+        CHECK(s.current_mhz() == 5180);
+    }
+
+    void test_tuning()
+    {
+        using core::band;
+
+        CHECK(core::range_of(band::ghz24).low_mhz == 2130 && core::range_of(band::ghz24).high_mhz == 2730);
+        CHECK(core::range_of(band::ghz5).low_mhz == 4790 && core::range_of(band::ghz5).high_mhz == 5990);
+        CHECK(core::step_frequency(band::ghz24, 2437, 5) == 2442);
+        CHECK(core::step_frequency(band::ghz24, 2437, -20) == 2417);
+        CHECK(core::step_frequency(band::ghz24, 2730, 1) == 2130);  // wraps up
+        CHECK(core::step_frequency(band::ghz24, 2132, -5) == 2730); // wraps down
+        CHECK(core::step_frequency(band::ghz5, 5985, 10) == 4790);
+        CHECK(core::step_frequency(band::ghz5, 4790, 0) == 4790);
     }
 
     struct press
@@ -430,6 +440,14 @@ namespace
         CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 80);
         CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 20);
 
+        CHECK(s.step_mhz == 5);
+        CHECK(core::menu_change(s, core::menu_item::step, 80) && s.step_mhz == 10);
+        core::menu_value(s, core::menu_item::step, value, sizeof(value), nullptr);
+        CHECK(std::string(value) == "10 MHz");
+        core::menu_change(s, core::menu_item::step, 80);
+        core::menu_change(s, core::menu_item::step, 80);
+        CHECK(s.step_mhz == 1);
+
         CHECK(s.gain == core::gain_auto);
         core::menu_value(s, core::menu_item::gain, value, sizeof(value), nullptr);
         CHECK(std::string(value) == "Auto");
@@ -462,13 +480,14 @@ namespace
         const auto p24 = core::make_survey_plan(core::band::ghz24);
         const auto p5 = core::make_survey_plan(core::band::ghz5);
 
-        CHECK(p24.centres_mhz == std::vector<uint16_t>({2420, 2460, 2500}));
-        CHECK(p5.centres_mhz.size() == 19);
-        CHECK(p5.centres_mhz.front() == 5170 && p5.centres_mhz.back() == 5890);
-        CHECK(core::survey_pixel(p24, 320, 2400) == 0);
-        CHECK(core::survey_pixel(p24, 320, 2437) == 118);
-        CHECK(core::survey_pixel(p24, 320, 2500) == -1);
-        // Every channel of each band is on its line.
+        CHECK(p24.centres_mhz.size() == 15);
+        CHECK(p24.centres_mhz.front() == 2150 && p24.centres_mhz.back() == 2710);
+        CHECK(p5.centres_mhz.size() == 30);
+        CHECK(p5.centres_mhz.front() == 4810 && p5.centres_mhz.back() == 5970);
+        CHECK(core::survey_pixel(p24, 320, 2130) == 0);
+        CHECK(core::survey_pixel(p24, 320, 2430) == 160);
+        CHECK(core::survey_pixel(p24, 320, 2730) == -1);
+        // Every Wi-Fi channel is on its band's line.
         for (const auto &c : core::channels_24)
             CHECK(core::survey_pixel(p24, 320, c.mhz) >= 0);
         for (const auto &c : core::channels_5)
@@ -502,7 +521,7 @@ namespace
             line.add(samples.data(), block.scale, step);
         }
 
-        CHECK(line.captures() == 3);
+        CHECK(line.captures() == plan.centres_mhz.size());
         line.finish(peak.data(), mean.data());
 
         unsigned best = 0;
@@ -511,7 +530,7 @@ namespace
             if (peak[x] > peak[best])
                 best = x;
 
-        const int expected = core::survey_pixel(plan, 320, 2465);
+        const int expected = core::survey_pixel(plan, 320, plan.centres_mhz[1] + 5);
 
         std::printf("survey: tone at pixel %u (expected %d)\n", best, expected);
         CHECK(std::abs(static_cast<int>(best) - expected) <= 1);
@@ -532,7 +551,7 @@ namespace
             seed = seed * 1664525u + 1013904223u;
             return (seed >> 8) / 16777216.0;
         };
-        const int tone_px = core::survey_pixel(plan, 320, 2470);
+        const int tone_px = core::survey_pixel(plan, 320, plan.centres_mhz[1] + 11);
 
         line.configure(plan, n, core::sample_rate_hz, 320);
 
@@ -549,8 +568,8 @@ namespace
                         const double hump_db = -10.0 * (offset / 256.0) * (offset / 256.0);
                         double power = 400.0 * std::pow(10.0, hump_db / 10) * (0.5 + uniform());
 
-                        // +10 MHz in the second step (2470 MHz): a strong carrier.
-                        if (step == 1 && offset == 128)
+                        // A 3 MHz wide signal from +10 MHz in the second step, 20 dB up.
+                        if (step == 1 && offset >= 128 && offset < 168)
                             power *= 100;
 
                         spectrum[2 * k] = static_cast<int16_t>(std::lround(std::sqrt(power)));
@@ -574,9 +593,9 @@ namespace
 
         std::printf("survey passband: flat floor %u..%u codes, tone %u codes\n", lo, hi, mean[tone_px]);
         CHECK(hi - lo <= 4);                  // within 2 dB after correction (the hump was 10 dB)
-        // The 20 dB single-bin carrier shares its pixel with 3 noise bins (-6 dB in
-        // the mean): it must stay at least 12 dB clear of the corrected floor.
-        CHECK(mean[tone_px] >= hi + 24);
+        // The 20 dB signal fills its pixel; it must stay at least 15 dB clear of
+        // the corrected floor (the passband estimate must not absorb it).
+        CHECK(mean[tone_px] >= hi + 30);
         CHECK(*std::min_element(mean.begin(), mean.end()) > 0); // guard pixels were filled
     }
 
@@ -617,6 +636,7 @@ int main()
     test_orientation_and_line();
     test_floor_tracker();
     test_channels();
+    test_tuning();
     test_gestures();
     test_auto_level();
     test_menu();

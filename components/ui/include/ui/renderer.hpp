@@ -61,7 +61,8 @@ namespace ui
         void menu_row(int y, uint16_t *row) const;
         void build_axis(const core::state &state);
         void build_channel_axis(unsigned centre_mhz, unsigned span_mhz);
-        void build_band_axis(core::band band, unsigned cursor_mhz);
+        void build_band_axis(core::band band, unsigned cursor_mhz, unsigned span_mhz);
+        void draw_axis(int low_mhz, int high_mhz, int label_step, int bar_low, int bar_high, int marker);
         template <typename RowFn> void flush(RowFn &&row_fn);
         int level(uint8_t code, int scale) const;
 
@@ -73,7 +74,7 @@ namespace ui
         unsigned m_head = 0;
         uint16_t *m_axis = nullptr; // axis_h rows, cached per tuning
         uint32_t m_mapping = 0;     // pixel-to-frequency mapping of the waterfall
-        unsigned m_axis_cursor = 0; // selected channel the axis was drawn for
+        uint32_t m_axis_key = 0;    // frequency and span the axis was drawn for
         int m_marker_x = width / 2; // selected channel's centre in the spectrum
         std::array<uint8_t, width> m_mean{};
         std::array<uint8_t, width> m_hold{};

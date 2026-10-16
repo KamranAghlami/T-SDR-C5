@@ -11,7 +11,6 @@
 #include "core/colormap.hpp"
 #include "core/font5x7.hpp"
 #include "core/menu.hpp"
-#include "core/survey.hpp"
 
 namespace ui
 {
@@ -32,7 +31,7 @@ namespace ui
         constexpr uint16_t channel_bar = core::rgb565(0, 160, 200);
         constexpr uint16_t menu_bg = core::rgb565(10, 14, 24);
         constexpr uint16_t menu_selected = core::rgb565(0, 70, 120);
-        constexpr int menu_row_h = 22;
+        constexpr int menu_row_h = 19; // 8 items in the 154 px below the status bar
         // Axis rows: cursor bar 0-1, labels 2-8, ticks 10-11 (pointing at the waterfall).
         constexpr int label_row = 2;
         constexpr int tick_row = 10;
@@ -142,12 +141,14 @@ namespace ui
             }
         }
 
-        const auto &channel = f.state.current_channel();
+        const unsigned mhz = f.state.current_mhz();
         const bool band_view = f.state.view == core::view_id::band;
         // What each pixel means. In the band view the cursor moves without
         // changing it, so the waterfall survives cursor moves.
         const uint32_t mapping = band_view ? 0x80000000u | static_cast<uint32_t>(f.state.band)
-                                           : (static_cast<uint32_t>(channel.mhz) << 8) | f.state.span_mhz;
+                                           : (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
+        // The axis also shows the cursor and the channel-view span.
+        const uint32_t axis = (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
 
         if (mapping != m_mapping)
         {
@@ -155,17 +156,16 @@ namespace ui
             m_hold.fill(0);
             m_floor.reset();
             std::memset(m_waterfall, 0, waterfall_h * width);
-            m_axis_cursor = 0; // force an axis rebuild
+            m_axis_key = ~axis; // force an axis rebuild
         }
 
-        if (channel.mhz != m_axis_cursor)
+        if (axis != m_axis_key)
         {
-            m_axis_cursor = channel.mhz;
+            m_axis_key = axis;
             build_axis(f.state);
         }
 
-        std::snprintf(m_status_left, sizeof(m_status_left), "%s CH%u %u", core::band_name(f.state.band), channel.number,
-                      channel.mhz);
+        std::snprintf(m_status_left, sizeof(m_status_left), "%s %u MHz", core::band_name(f.state.band), mhz);
         const char *mode = f.state.frozen ? "FROZEN" : f.state.detector == core::detector::peak ? "PEAK" : "MEAN";
 
         if (band_view)
@@ -244,11 +244,11 @@ namespace ui
         char value[24];
 
         core::menu_value(m_last.state, item, value, sizeof(value), m_last.version);
-        text_row(row, y % menu_row_h - 4, 6, core::menu_label(item), 2, selected ? white : grey);
+        text_row(row, y % menu_row_h - 2, 6, core::menu_label(item), 2, selected ? white : grey);
         // Long values (the version string) drop to the small font.
         const int scale = text_width(value, 2) > width - 96 ? 1 : 2;
 
-        text_row(row, y % menu_row_h - (scale == 2 ? 4 : 7), width - 6 - text_width(value, scale), value, scale, white);
+        text_row(row, y % menu_row_h - (scale == 2 ? 2 : 6), width - 6 - text_width(value, scale), value, scale, white);
     }
 
     void renderer::status_row(int y, uint16_t *row) const
@@ -299,23 +299,20 @@ namespace ui
 
     void renderer::build_axis(const core::state &state)
     {
-        const auto &channel = state.current_channel();
-
         if (state.view == core::view_id::band)
-            build_band_axis(state.band, channel.mhz);
+            build_band_axis(state.band, state.current_mhz(), state.span_mhz);
         else
-            build_channel_axis(channel.mhz, state.span_mhz);
+            build_channel_axis(state.current_mhz(), state.span_mhz);
     }
 
-    void renderer::build_channel_axis(unsigned centre, unsigned span_mhz)
+    // MHz labels at round frequencies. The bar on top marks [low, high).
+    void renderer::draw_axis(int low_mhz, int high_mhz, int label_step, int bar_low, int bar_high, int marker)
     {
-        const int span = static_cast<int>(span_mhz);
-        const int centre_mhz = static_cast<int>(centre);
-        const int label_step = span <= 20 ? 5 : span <= 40 ? 10 : 20;
-        const auto x_of = [&](int mhz) { return width / 2 + (mhz - centre_mhz) * width / span; };
+        const int span = high_mhz - low_mhz;
+        const auto x_of = [&](int mhz) { return (mhz - low_mhz) * width / span; };
         char label[12];
 
-        m_marker_x = width / 2;
+        m_marker_x = x_of(marker);
 
         for (int r = 0; r < axis_h; r++)
         {
@@ -323,11 +320,13 @@ namespace ui
 
             std::fill(row, row + width, axis_bg);
 
-            // The selected 20 MHz channel.
             if (r < 2)
-                std::fill(row + std::max(0, x_of(centre_mhz - 10)), row + std::min(width, x_of(centre_mhz + 10)), channel_bar);
+                std::fill(row + std::clamp(x_of(bar_low), 0, width), row + std::clamp(x_of(bar_high), 0, width), channel_bar);
 
-            for (int mhz = (centre_mhz - span / 2) / label_step * label_step; mhz <= centre_mhz + span / 2; mhz += label_step)
+            if (r >= tick_row && m_marker_x >= 0 && m_marker_x < width)
+                row[m_marker_x] = white;
+
+            for (int mhz = (low_mhz + label_step - 1) / label_step * label_step; mhz <= high_mhz; mhz += label_step)
             {
                 const int x = x_of(mhz);
 
@@ -339,53 +338,29 @@ namespace ui
 
                 std::snprintf(label, sizeof(label), "%d", mhz);
 
-                const int lx = std::clamp(x - text_width(label, 1) / 2, 0, width - text_width(label, 1));
+                const int w = text_width(label, 1);
 
-                text_row(row, r - label_row, lx, label, 1, grey);
+                text_row(row, r - label_row, std::clamp(x - w / 2, 0, width - w), label, 1, grey);
             }
         }
     }
 
-    // The whole band: a tick per channel along the bottom, the cursor channel's
-    // number and its 20 MHz extent highlighted. Only the cursor is labelled:
-    // 5 GHz channels sit 9 px apart, too close for readable numbers.
-    void renderer::build_band_axis(core::band band, unsigned cursor_mhz)
+    void renderer::build_channel_axis(unsigned centre_mhz, unsigned span_mhz)
     {
-        const auto plan = core::make_survey_plan(band);
-        const int span = plan.high_mhz - plan.low_mhz;
-        const auto x_of = [&](int mhz) { return (mhz - plan.low_mhz) * width / span; };
-        const int cursor_x = x_of(static_cast<int>(cursor_mhz));
-        char label[8] = "";
+        const int centre = static_cast<int>(centre_mhz), span = static_cast<int>(span_mhz);
+        const int label_step = span <= 20 ? 5 : span <= 40 ? 10 : 20;
 
-        for (const auto &c : core::channels(band))
-            if (c.mhz == cursor_mhz)
-                std::snprintf(label, sizeof(label), "%u", c.number);
+        // The bar marks a 20 MHz channel's width around the centre.
+        draw_axis(centre - span / 2, centre + span / 2, label_step, centre - 10, centre + 10, centre);
+    }
 
-        const int label_w = text_width(label, 1);
-        const int label_x = std::clamp(cursor_x - label_w / 2, 0, width - label_w);
+    void renderer::build_band_axis(core::band band, unsigned cursor_mhz, unsigned span_mhz)
+    {
+        const auto range = core::range_of(band);
+        const int span = range.high_mhz - range.low_mhz;
+        const int cursor = static_cast<int>(cursor_mhz), half = static_cast<int>(span_mhz) / 2;
 
-        m_marker_x = cursor_x;
-
-        for (int r = 0; r < axis_h; r++)
-        {
-            uint16_t *row = m_axis + r * width;
-
-            std::fill(row, row + width, axis_bg);
-
-            if (r < 2)
-                std::fill(row + std::max(0, x_of(static_cast<int>(cursor_mhz) - 10)),
-                          row + std::min(width, x_of(static_cast<int>(cursor_mhz) + 10)), channel_bar);
-
-            if (r >= tick_row)
-                for (const auto &c : core::channels(band))
-                {
-                    const int x = x_of(c.mhz);
-
-                    if (x >= 0 && x < width)
-                        row[x] = c.mhz == cursor_mhz ? white : grey;
-                }
-
-            text_row(row, r - label_row, label_x, label, 1, white);
-        }
+        // The bar marks what the channel view would show at the cursor.
+        draw_axis(range.low_mhz, range.high_mhz, span > 800 ? 200 : 100, cursor - half, cursor + half, cursor);
     }
 }

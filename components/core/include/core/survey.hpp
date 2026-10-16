@@ -21,7 +21,7 @@ namespace core
         std::vector<uint16_t> centres_mhz;
     };
 
-    // 2.4 GHz: 2400-2500 MHz in 3 steps. 5 GHz: 5150-5895 MHz (UNII-1 to 4) in 19.
+    // The band's whole tuning range: 2130-2730 MHz in 15 steps, 4790-5990 MHz in 30.
     survey_plan make_survey_plan(band b);
 
     // Pixel (0..width-1) of a frequency on the survey line, or -1 outside it.

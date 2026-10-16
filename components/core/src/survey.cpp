@@ -5,12 +5,14 @@
 #include <limits>
 
 #include "core/spectrum.hpp"
+#include "core/state.hpp"
 
 namespace core
 {
     survey_plan make_survey_plan(band b)
     {
-        survey_plan plan = b == band::ghz24 ? survey_plan{2400, 2500, {}} : survey_plan{5150, 5895, {}};
+        const auto range = range_of(b);
+        survey_plan plan{range.low_mhz, range.high_mhz, {}};
         const unsigned half = survey_step_mhz / 2;
 
         for (unsigned centre = plan.low_mhz + half; centre - half < plan.high_mhz; centre += survey_step_mhz)
