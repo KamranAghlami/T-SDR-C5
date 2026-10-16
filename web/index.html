@@ -5,78 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>T-SDR-C5 Flasher</title>
   <meta name="description" content="Install the t-sdr-c5 Wi-Fi waterfall firmware on a LilyGO T-Display-C5 from your browser.">
-  <!-- ESP Web Tools built from source in CI (esptool-js 0.7.0, needed for ESP32-C5 rev 1.2). -->
-  <script type="module" src="esp-web-tools/install-button.js"></script>
   <style>
     :root {
       --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #5b6270; --border: #dde1e7;
       --accent: #0a6fd6; --accent-text: #ffffff; --warn-bg: #fff5e0; --warn-text: #6b4a00;
-      --field: #eef1f5;
+      --field: #eef1f5; --ok: #1a7f37; --error: #c62828;
+      --log-bg: #0f1218; --log-text: #d6dbe4; --log-info: #6fd18b; --log-warn: #f2c14e; --log-error: #ff7b72;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
         --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
         --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
-        --field: #222733;
+        --field: #222733; --ok: #56d364; --error: #ff7b72;
+        --log-bg: #0a0c10;
       }
     }
     :root[data-theme="dark"] {
       --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
       --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
-      --field: #222733;
+      --field: #222733; --ok: #56d364; --error: #ff7b72;
+      --log-bg: #0a0c10;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0; background: var(--bg); color: var(--text);
       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    main { max-width: 640px; margin: 0 auto; padding: 40px 16px 56px; }
+    main { max-width: 680px; margin: 0 auto; padding: 40px 16px 56px; }
     h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+    h2 { font-size: 1.1rem; margin: 0 0 4px; }
     .lede { color: var(--muted); margin: 0 0 28px; }
+    .hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
     .card {
       background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-      padding: 22px 22px 18px; margin-bottom: 20px;
+      padding: 22px; margin-bottom: 20px;
     }
-    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
-    .field label { font-size: 0.9rem; color: var(--muted); }
+    a { color: var(--accent); }
+    label { font-size: 0.9rem; color: var(--muted); }
     select {
       font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--border);
-      border-radius: 8px; padding: 10px 12px; max-width: 100%;
+      border-radius: 8px; padding: 10px 12px; width: 100%;
     }
-    select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .notes { margin: 0 0 16px; font-size: 0.9rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .stack { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .check { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 0.95rem; margin: 4px 0 18px; }
+    .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+    button {
+      font: inherit; font-weight: 600; border-radius: 8px; padding: 10px 18px; cursor: pointer;
+      border: 1px solid transparent;
+    }
+    button.primary { background: var(--accent); color: var(--accent-text); }
+    button.secondary { background: transparent; color: var(--text); border-color: var(--border); }
+    button:disabled { opacity: 0.45; cursor: default; }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .status { margin: 14px 0 0; min-height: 1.5em; font-size: 0.95rem; }
+    .status.ok { color: var(--ok); }
+    .status.error { color: var(--error); }
+    progress {
+      width: 100%; height: 8px; margin-top: 10px; appearance: none; border: 0; border-radius: 4px;
+      background: var(--field); overflow: hidden; display: none;
+    }
+    progress.active { display: block; }
+    progress::-webkit-progress-bar { background: var(--field); }
+    progress::-webkit-progress-value { background: var(--accent); }
+    progress::-moz-progress-bar { background: var(--accent); }
+    pre {
+      margin: 14px 0 0; height: 300px; overflow: auto; background: var(--log-bg); color: var(--log-text);
+      border-radius: 8px; padding: 12px; font: 12.5px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    pre .i { color: var(--log-info); }
+    pre .w { color: var(--log-warn); }
+    pre .e { color: var(--log-error); }
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+    details pre { height: 160px; }
+    .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 10px 12px; margin-bottom: 20px; }
     ol { padding-left: 1.25rem; margin: 0; }
     li { margin: 6px 0; }
-    h2 { font-size: 1.05rem; margin: 0 0 10px; }
-    a { color: var(--accent); }
-    code { font-size: 0.9em; }
-    .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 10px 12px; }
-    esp-web-install-button button {
-      background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
-      padding: 12px 22px; font: inherit; font-weight: 600; cursor: pointer;
-    }
     footer { color: var(--muted); font-size: 0.85rem; }
-
-    /* ESP Web Tools' install and log dialogs (Material Web in a shadow root):
-       page styles on the host element override its :host defaults. */
-    ewt-install-dialog {
-      --roboto-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      --text-color: var(--muted);
-      --danger-color: #d93025;
-      --md-sys-color-primary: var(--accent);
-      --md-sys-color-on-primary: var(--accent-text);
-      --md-sys-color-surface: var(--card);
-      --md-sys-color-surface-container: var(--card);
-      --md-sys-color-surface-container-high: var(--card);
-      --md-sys-color-surface-container-highest: var(--field);
-      --md-sys-color-secondary-container: var(--field);
-      --md-sys-color-on-surface: var(--text);
-      --md-sys-color-on-surface-variant: var(--muted);
-      --md-sys-color-outline: var(--border);
-      --md-sys-color-outline-variant: var(--border);
-      --md-sys-color-scrim: #000;
-      --md-sys-color-error: #d93025;
-    }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -84,81 +92,260 @@
   <h1>t-sdr-c5</h1>
   <p class="lede">A pocket Wi-Fi spectrum waterfall for the LilyGO T-Display-C5. Install it from your browser.</p>
 
-  <section class="card">
-    <div class="field">
-      <label for="version">Firmware version</label>
+  <div class="warn" id="unsupported" hidden>
+    This browser can't talk to serial devices. Use Chrome, Edge or Opera on a desktop computer, or flash
+    <a href="https://github.com/KamranAghlami/t-sdr-c5/releases/latest">the release image</a> with esptool.
+  </div>
+
+  <section class="card" aria-labelledby="install-title">
+    <h2 id="install-title">Install firmware</h2>
+    <p class="hint">Connect the antenna, plug the board in over USB-C, then choose a version.</p>
+    <div class="stack">
+      <label for="version">Version</label>
       <select id="version" disabled><option>Loading releases…</option></select>
+      <a id="notes" href="https://github.com/KamranAghlami/t-sdr-c5/releases">Release notes</a>
     </div>
-    <p class="notes"><a id="notes" href="https://github.com/KamranAghlami/t-sdr-c5/releases">Release notes</a></p>
-    <esp-web-install-button>
-      <button slot="activate">Install t-sdr-c5</button>
-      <div slot="unsupported" class="warn">
-        This browser can't talk to serial devices. Use Chrome, Edge or Opera on a desktop computer,
-        or flash <a href="https://github.com/KamranAghlami/t-sdr-c5/releases/latest">the release image</a> with esptool.
-      </div>
-      <div slot="not-allowed" class="warn">Serial access needs a secure (https) page.</div>
-    </esp-web-install-button>
+    <label class="check"><input type="checkbox" id="erase"> Erase the board first (clean install, resets settings)</label>
+    <div class="row">
+      <button class="primary" id="install" disabled>Install</button>
+    </div>
+    <progress id="progress" max="1" value="0"></progress>
+    <p class="status" id="install-status" role="status"></p>
+    <details>
+      <summary>Installer log</summary>
+      <pre id="install-log"></pre>
+    </details>
+  </section>
+
+  <section class="card" aria-labelledby="console-title">
+    <h2 id="console-title">Serial console</h2>
+    <p class="hint">Shows what the board prints (warnings and errors; the stats build logs once per second).</p>
+    <div class="row">
+      <button class="primary" id="console-toggle">Connect</button>
+      <button class="secondary" id="console-reset" disabled>Reset board</button>
+      <button class="secondary" id="console-clear">Clear</button>
+      <label class="check" style="margin:0"><input type="checkbox" id="autoscroll" checked> Auto-scroll</label>
+    </div>
+    <pre id="console" aria-live="off"></pre>
   </section>
 
   <section class="card">
-    <h2>Steps</h2>
+    <h2>Tips</h2>
     <ol>
-      <li>Connect the board's antenna, then plug the board in over USB-C.</li>
-      <li>Click <b>Install</b> and choose the board's serial port (often "USB JTAG/serial debug unit").</li>
-      <li>Updating keeps your settings. Erase only for a clean install, if the page offers it.</li>
-      <li>If the board isn't detected, hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b> and try again.</li>
+      <li>Choose the board's port when asked (often "USB JTAG/serial debug unit").</li>
+      <li>Installing without erasing keeps your band, channel and settings.</li>
+      <li>If the board isn't found, hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b> and try again.</li>
+      <li>Usage is explained in the <a href="https://github.com/KamranAghlami/t-sdr-c5#using-it">README</a>.</li>
     </ol>
   </section>
 
-  <section class="card">
-    <h2>After installing</h2>
-    <p style="margin:0">Short presses on the two buttons step through channels; a long press on the USER button switches
-      between 2.4 and 5 GHz; a long press on BOOT opens the settings. The full guide is in the
-      <a href="https://github.com/KamranAghlami/t-sdr-c5#using-it">README</a>. The install dialog's
-      <b>Logs</b> view shows the board's serial output.</p>
-  </section>
-
-  <script type="module">
-    // Lists every release (versions.json, newest first) and points the install
-    // button at the chosen one's manifest. ?version=vX.Y.Z preselects a release.
-    const select = document.getElementById('version');
-    const notes = document.getElementById('notes');
-    const button = document.querySelector('esp-web-install-button');
-    const releaseUrl = (v) => `https://github.com/KamranAghlami/t-sdr-c5/releases/tag/${encodeURIComponent(v)}`;
-
-    function choose(version) {
-      const manifest = `manifests/${encodeURIComponent(version)}.json`;
-      button.setAttribute('manifest', manifest);
-      button.manifest = manifest;
-      notes.href = releaseUrl(version);
-      notes.textContent = `Release notes for ${version}`;
-    }
-
-    try {
-      const versions = await (await fetch('versions.json', { cache: 'no-cache' })).json();
-      const wanted = new URLSearchParams(location.search).get('version');
-      const fallback = versions.find((v) => v.latest) ?? versions.find((v) => !v.prerelease) ?? versions[0];
-      const initial = versions.find((v) => v.version === wanted) ?? fallback;
-
-      select.replaceChildren(...versions.map((v) => {
-        const tags = [v.latest && 'latest', v.prerelease && 'pre-release'].filter(Boolean);
-        const option = new Option(`${v.version}${tags.length ? ` (${tags.join(', ')})` : ''} · ${v.date}`, v.version);
-        option.selected = v === initial;
-        return option;
-      }));
-      select.disabled = false;
-      select.addEventListener('change', () => choose(select.value));
-      choose(initial.version);
-    } catch (error) {
-      select.replaceChildren(new Option('Could not load releases'));
-      console.error(error);
-    }
-  </script>
-
   <footer>
-    Receive-only firmware built on <a href="https://github.com/ESPARGOS/esp-sdr">ESP-SDR</a>.
+    Receive-only firmware built on <a href="https://github.com/ESPARGOS/esp-sdr">ESP-SDR</a>; flashing by
+    <a href="https://github.com/espressif/esptool-js">esptool-js</a>.
     <a href="https://github.com/KamranAghlami/t-sdr-c5">Source (GPL-3.0)</a>.
   </footer>
 </main>
+
+<script type="module">
+  import { ESPLoader, Transport } from 'https://unpkg.com/esptool-js@0.7.0/bundle.js';
+
+  const $ = (id) => document.getElementById(id);
+  const select = $('version'), notes = $('notes'), erase = $('erase'), installButton = $('install');
+  const progress = $('progress'), installStatus = $('install-status'), installLog = $('install-log');
+  const consoleToggle = $('console-toggle'), consoleReset = $('console-reset'), consoleOut = $('console');
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const supported = 'serial' in navigator;
+
+  // ---- versions --------------------------------------------------------------
+  const releaseUrl = (v) => `https://github.com/KamranAghlami/t-sdr-c5/releases/tag/${encodeURIComponent(v)}`;
+
+  function choose(version) {
+    notes.href = releaseUrl(version);
+    notes.textContent = `Release notes for ${version}`;
+  }
+
+  try {
+    const versions = await (await fetch('versions.json', { cache: 'no-cache' })).json();
+    const wanted = new URLSearchParams(location.search).get('version');
+    const fallback = versions.find((v) => v.latest) ?? versions.find((v) => !v.prerelease) ?? versions[0];
+    const initial = versions.find((v) => v.version === wanted) ?? fallback;
+
+    select.replaceChildren(...versions.map((v) => {
+      const tags = [v.latest && 'latest', v.prerelease && 'pre-release'].filter(Boolean);
+      const option = new Option(`${v.version}${tags.length ? ` (${tags.join(', ')})` : ''} · ${v.date}`, v.version);
+      option.selected = v === initial;
+      return option;
+    }));
+    select.disabled = false;
+    installButton.disabled = !supported;
+    select.addEventListener('change', () => choose(select.value));
+    choose(initial.version);
+  } catch (error) {
+    select.replaceChildren(new Option('Could not load releases'));
+    console.error(error);
+  }
+
+  if (!supported) {
+    $('unsupported').hidden = false;
+    consoleToggle.disabled = true;
+  }
+
+  // ---- install ---------------------------------------------------------------
+  const setStatus = (text, kind = '') => {
+    installStatus.textContent = text;
+    installStatus.className = `status ${kind}`;
+  };
+  const terminal = {
+    clean() { installLog.textContent = ''; },
+    writeLine(line) { installLog.textContent += `${line}\n`; installLog.scrollTop = installLog.scrollHeight; },
+    write(text) { installLog.textContent += text; installLog.scrollTop = installLog.scrollHeight; },
+  };
+
+  async function fetchParts(version) {
+    const manifestUrl = new URL(`manifests/${encodeURIComponent(version)}.json`, location.href);
+    const manifest = await (await fetch(manifestUrl, { cache: 'no-cache' })).json();
+
+    return Promise.all(manifest.builds[0].parts.map(async (part) => {
+      const response = await fetch(new URL(part.path, manifestUrl));
+
+      if (!response.ok) throw new Error(`Download failed: ${part.path} (${response.status})`);
+      return { address: part.offset, data: new Uint8Array(await response.arrayBuffer()) };
+    }));
+  }
+
+  installButton.addEventListener('click', async () => {
+    const version = select.value;
+    let transport;
+
+    // The port picker must open straight from the click, before any downloads.
+    let port;
+    try {
+      port = await navigator.serial.requestPort();
+    } catch {
+      return; // picker cancelled
+    }
+
+    await closeConsole();
+    installButton.disabled = select.disabled = erase.disabled = true;
+    progress.value = 0;
+    progress.classList.add('active');
+    terminal.clean();
+
+    try {
+      setStatus(`Downloading ${version}…`);
+      const files = await fetchParts(version);
+      const total = files.reduce((sum, f) => sum + f.data.length, 0);
+
+      setStatus('Connecting to the board…');
+      transport = new Transport(port, false);
+      const loader = new ESPLoader({ transport, baudrate: 921600, terminal });
+      const chip = await loader.main();
+
+      if (loader.chip.CHIP_NAME !== 'ESP32-C5')
+        throw new Error(`This board is an ${loader.chip.CHIP_NAME}; t-sdr-c5 needs an ESP32-C5 (T-Display-C5).`);
+
+      setStatus(erase.checked ? `Erasing and writing ${version}…` : `Writing ${version}…`);
+      await loader.writeFlash({
+        fileArray: files,
+        flashMode: 'keep',
+        flashFreq: 'keep',
+        flashSize: 'keep',
+        eraseAll: erase.checked,
+        compress: true,
+        reportProgress: (index, written, size) => {
+          const before = files.slice(0, index).reduce((sum, f) => sum + f.data.length, 0);
+          progress.value = (before + files[index].data.length * (size ? written / size : 1)) / total;
+        },
+      });
+      await loader.after('hard_reset');
+      progress.value = 1;
+      setStatus(`Installed ${version} on ${chip}. The board restarts by itself.`, 'ok');
+    } catch (error) {
+      console.error(error);
+      setStatus(`Install failed: ${error?.message ?? error}. Try BOOT + RST, then install again.`, 'error');
+    } finally {
+      try { await transport?.disconnect(); } catch { /* already closed */ }
+      installButton.disabled = select.disabled = erase.disabled = false;
+    }
+  });
+
+  // ---- console ---------------------------------------------------------------
+  let consoleTransport = null;
+  let reading = false;
+  let pending = '';
+  const maxLines = 2000;
+  const decoder = new TextDecoder();
+
+  function appendLine(line) {
+    const span = document.createElement('span');
+    const level = /^([IWE]) \(\d+\)/.exec(line)?.[1];
+
+    if (level) span.className = level.toLowerCase();
+    span.textContent = `${line}\n`;
+    consoleOut.append(span);
+
+    while (consoleOut.childNodes.length > maxLines) consoleOut.firstChild.remove();
+    if ($('autoscroll').checked) consoleOut.scrollTop = consoleOut.scrollHeight;
+  }
+
+  function onData(bytes) {
+    pending += decoder.decode(bytes, { stream: true });
+
+    let newline;
+    while ((newline = pending.indexOf('\n')) !== -1) {
+      appendLine(pending.slice(0, newline).replace(/\r$/, ''));
+      pending = pending.slice(newline + 1);
+    }
+  }
+
+  async function openConsole() {
+    let port;
+    try {
+      port = await navigator.serial.requestPort();
+    } catch {
+      return;
+    }
+
+    consoleTransport = new Transport(port, false);
+    await consoleTransport.connect(115200);
+    reading = true;
+    consoleToggle.textContent = 'Disconnect';
+    consoleReset.disabled = false;
+    appendLine('[connected]');
+    consoleTransport.rawRead(onData, () => !reading)
+      .catch((error) => appendLine(`[read error: ${error?.message ?? error}]`))
+      .finally(() => { if (reading) closeConsole(); });
+  }
+
+  async function closeConsole() {
+    if (!consoleTransport) return;
+
+    const transport = consoleTransport;
+
+    consoleTransport = null;
+    reading = false;
+    try {
+      await transport.disconnect();
+      await transport.waitForUnlock?.(1500);
+    } catch { /* already gone */ }
+    if (pending) appendLine(pending);
+    pending = '';
+    appendLine('[disconnected]');
+    consoleToggle.textContent = 'Connect';
+    consoleReset.disabled = true;
+  }
+
+  consoleToggle.addEventListener('click', () => (consoleTransport ? closeConsole() : openConsole()));
+  $('console-clear').addEventListener('click', () => consoleOut.replaceChildren());
+
+  // USB Serial/JTAG: RTS pulls the chip's enable low; DTR low keeps it out of download mode.
+  consoleReset.addEventListener('click', async () => {
+    if (!consoleTransport) return;
+    await consoleTransport.setDTR(false);
+    await consoleTransport.setRTS(true);
+    await sleep(100);
+    await consoleTransport.setRTS(false);
+  });
+</script>
 </body>
 </html>

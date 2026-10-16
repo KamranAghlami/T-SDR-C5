@@ -30,10 +30,9 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
   Pages by the `pages` job on `v*` tags, or by hand (`gh workflow run ci.yml
   --ref main`). It offers every published release (version selector,
   `?version=` preselects) and flashes the separate images so NVS survives.
-- The flasher's ESP Web Tools is built from a pinned upstream commit (ci.yml
-  `web` job) because 10.4.0 bundles esptool-js 0.6.x, which can't detect
-  ESP32-C5 rev 1.2 ("Failed to initialize"). Once a release > 10.4.0 ships
-  esptool-js >= 0.7.0, drop the job and load it from unpkg again.
+- The flasher page drives esptool-js 0.7.0 (unpkg, pinned) directly: >= 0.7.0
+  is needed to detect ESP32-C5 rev 1.2. ESP Web Tools was dropped: its dialog
+  bundles an older esptool-js (10.4.0) and mixes the console into the install flow.
 - Logs: release builds are WARN level. For per-second measurements (lines/s,
   captures/line, per-phase timing, battery) build with
   `CONFIG_T_SDR_C5_STATS_LOG=y` and `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` (the

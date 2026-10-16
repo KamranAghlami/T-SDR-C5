@@ -6,7 +6,7 @@ and a directory holding each release's extracted archive (t-sdr-c5-<tag>/ with
 offsets.json and the images). Output, under the site directory:
 
   firmware/<tag>/*.bin     the images of each release
-  manifests/<tag>.json     ESP Web Tools manifest per release
+  manifests/<tag>.json     parts and offsets per release (ESP Web Tools format)
   versions.json            [{version, date, prerelease, latest}], newest first
 
 Manifests list the bootloader, partition table and app separately (not the
