@@ -12,10 +12,9 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 [![Release](https://img.shields.io/github/v/release/KamranAghlami/t-sdr-c5?include_prereleases)](https://github.com/KamranAghlami/t-sdr-c5/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-> **Status:** [v0.1.0](https://github.com/KamranAghlami/t-sdr-c5/releases/tag/v0.1.0) is the
-> hardware-verified channel view. `main` adds the M3 features (fast capture, upper-5 GHz tuning,
-> auto-level gain, settings menu, battery), which are still awaiting their hardware test.
-> See [the milestones](docs/SPEC.md#9-milestones).
+> **Status:** [v0.2.0](https://github.com/KamranAghlami/t-sdr-c5/releases/latest) is the full channel
+> view: fast capture, upper-5 GHz tuning, auto-level gain, settings menu and battery, all verified on
+> hardware. A band-survey view is next; see [the milestones](docs/SPEC.md#9-milestones).
 
 ## Features
 

@@ -249,7 +249,7 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | M0 | Feasibility spike + HW check — **done** | — |
 | M1 | Repo skeleton, CI, release pipeline, board bring-up, radio capture → one spectrum line — **done** | — |
 | M2 | Channel view MVP: waterfall, spectrum, status, channel/band buttons, NVS — **done, verified on HW** | `v0.1.0` ✅ |
-| M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % — **on `main`, awaiting HW test** | `v0.2.0` |
+| M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % — **done, verified on HW** | `v0.2.0` ✅ |
 | M4 | Stretch: band survey, web flasher | `v0.3.0` |
 
 ## 10. Testing
