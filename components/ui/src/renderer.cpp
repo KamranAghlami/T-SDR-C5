@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include <esp_heap_caps.h>
+#include <esp_timer.h>
 
 #include "core/colormap.hpp"
 #include "core/font5x7.hpp"
@@ -162,8 +163,25 @@ namespace ui
         std::snprintf(m_status_right[1], sizeof(m_status_right[1]), "%u/s %c%u%s", f.lines_per_s, gain_mode, f.gain,
                       battery);
 
+        for (int x = 0; x < width; x++)
+        {
+            m_mean_h[x] = static_cast<uint8_t>(level(m_mean[x], spectrum_h));
+            m_hold_h[x] = static_cast<uint8_t>(level(m_hold[x], spectrum_h));
+        }
+
         m_last = f;
-        flush([this](int y, uint16_t *row) { render_row(y, row); });
+
+        int64_t busy = 0;
+
+        flush([this, &busy](int y, uint16_t *row) {
+            const int64_t start = esp_timer_get_time();
+
+            render_row(y, row);
+            busy += esp_timer_get_time() - start;
+        });
+
+        // Smoothed over about 8 frames.
+        m_render_us = static_cast<uint32_t>((m_render_us * 7 + static_cast<uint32_t>(busy)) / 8);
     }
 
     void renderer::render_row(int y, uint16_t *row) const
@@ -225,8 +243,8 @@ namespace ui
 
         for (int x = 0; x < width; x++)
         {
-            const int mean = level(m_mean[x], spectrum_h);
-            const int peak = level(m_hold[x], spectrum_h);
+            const int mean = m_mean_h[x];
+            const int peak = m_hold_h[x];
             uint16_t c = x == width / 2 ? centre : bg;
 
             if (h < mean)

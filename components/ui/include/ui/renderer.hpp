@@ -41,6 +41,9 @@ namespace ui
 
         void show(const frame &f);
 
+        // Average CPU time spent rendering rows per frame (excludes SPI waits).
+        uint32_t render_us() const { return m_render_us; }
+
     private:
         static constexpr int band_rows = 16;
         static constexpr int status_y = 0, status_h = 16;
@@ -70,6 +73,10 @@ namespace ui
         unsigned m_axis_mhz = 0, m_axis_span = 0;
         std::array<uint8_t, width> m_mean{};
         std::array<uint8_t, width> m_hold{};
+        // Plot heights of m_mean / m_hold, recomputed once per frame.
+        std::array<uint8_t, width> m_mean_h{};
+        std::array<uint8_t, width> m_hold_h{};
+        uint32_t m_render_us = 0;
         core::floor_tracker m_floor;
         frame m_last{};
         char m_status_left[24] = {};

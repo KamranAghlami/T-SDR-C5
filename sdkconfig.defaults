@@ -36,3 +36,6 @@ CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 
 # The radio task is CPU-bound by design; it yields once per waterfall line.
 # CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0 is not set
+
+# The PSRAM self-test adds about 1 s to every boot (verified good on hardware).
+# CONFIG_SPIRAM_MEMTEST is not set

@@ -3,6 +3,8 @@
 #include <cassert>
 
 #include <esp_app_desc.h>
+#include <esp_cpu.h>
+#include <sdkconfig.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -175,6 +177,9 @@ namespace
         bool retune = true;
         int64_t next_line = 0, save_at = 0, rate_start = esp_timer_get_time(), last_frame = 0;
         unsigned lines = 0, line_peak = 0, second_peak = 0;
+        // CPU cycles spent per phase during the current second, for the log.
+        uint64_t capture_cycles = 0, dsp_cycles = 0;
+        unsigned timed = 0;
         uint8_t gain = 0;
         c5_radio_stats_t last_stats;
 
@@ -249,13 +254,19 @@ namespace
             }
 
             const uint32_t *words;
+            const uint32_t t0 = esp_cpu_get_cycle_count();
 
             if (c5_radio_capture(core::fft_size, C5_RATE_80M, &words, nullptr) == ESP_OK)
             {
+                const uint32_t t1 = esp_cpu_get_cycle_count();
+
                 gain = static_cast<uint8_t>((words[0] >> 20) & 0x7f);
                 line_peak = std::max(line_peak, core::prepare_iq(words, core::fft_size, window.data(), samples));
                 fft.forward(samples);
                 accumulator.add(samples);
+                capture_cycles += t1 - t0;
+                dsp_cycles += esp_cpu_get_cycle_count() - t1;
+                timed++;
             }
 
             now = esp_timer_get_time();
@@ -293,10 +304,21 @@ namespace
 
                 c5_radio_get_stats(&stats);
                 f.lines_per_s = static_cast<uint16_t>(lines);
-                ESP_LOGI(tag, "%u lines/s, %u captures/line, %u failures, %u recalibrations, gain %u, peak %u, SRAM %u",
-                         lines, f.captures, static_cast<unsigned>(stats.failures - last_stats.failures),
+                constexpr unsigned mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+                const auto per_capture_us = [&](uint64_t cycles) {
+                    return static_cast<unsigned>(timed ? cycles / timed / mhz : 0);
+                };
+
+                ESP_LOGI(tag,
+                         "%u lines/s, %u captures/line (capture %u us, dsp %u us, ui %u us/frame), %u failures, "
+                         "%u recalibrations, gain %u, peak %u, SRAM %u",
+                         lines, f.captures, per_capture_us(capture_cycles), per_capture_us(dsp_cycles),
+                         static_cast<unsigned>(renderer.render_us()),
+                         static_cast<unsigned>(stats.failures - last_stats.failures),
                          static_cast<unsigned>(stats.recalibrations - last_stats.recalibrations), gain, second_peak,
                          static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+                capture_cycles = dsp_cycles = 0;
+                timed = 0;
                 last_stats = stats;
                 lines = 0;
                 second_peak = 0;
