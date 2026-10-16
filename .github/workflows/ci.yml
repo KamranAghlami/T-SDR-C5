@@ -115,3 +115,40 @@ jobs:
             dist/SHA256SUMS
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # Browser flasher (ESP Web Tools) for the tagged release on GitHub Pages.
+  pages:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: dist
+
+      - name: Build site
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          tar -xzf "dist/t-sdr-c5-$VERSION.tar.gz" -C dist
+          mkdir -p site/firmware
+          cp dist/t-sdr-c5-$VERSION/*.bin site/firmware/
+          python3 -I tools/web_manifest.py "dist/t-sdr-c5-$VERSION/offsets.json" --version "$VERSION" > site/manifest.json
+          sed "s/{{VERSION}}/$VERSION/" web/index.html > site/index.html
+          cat site/manifest.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

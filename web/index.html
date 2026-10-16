@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>T-SDR-C5 Flasher</title>
+  <meta name="description" content="Install the t-sdr-c5 Wi-Fi waterfall firmware on a LilyGO T-Display-C5 from your browser.">
+  <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #5b6270; --border: #dde1e7;
+      --accent: #0a6fd6; --accent-text: #ffffff; --warn-bg: #fff5e0; --warn-text: #6b4a00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
+        --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
+      --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 640px; margin: 0 auto; padding: 40px 16px 56px; }
+    h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .lede { color: var(--muted); margin: 0 0 28px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 22px 22px 18px; margin-bottom: 20px;
+    }
+    .version { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
+    ol { padding-left: 1.25rem; margin: 0; }
+    li { margin: 6px 0; }
+    h2 { font-size: 1.05rem; margin: 0 0 10px; }
+    a { color: var(--accent); }
+    code { font-size: 0.9em; }
+    .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 10px 12px; }
+    esp-web-install-button button {
+      background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+      padding: 12px 22px; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    footer { color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>t-sdr-c5</h1>
+  <p class="lede">A pocket Wi-Fi spectrum waterfall for the LilyGO T-Display-C5. Install it from your browser.</p>
+
+  <section class="card">
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Install t-sdr-c5</button>
+      <div slot="unsupported" class="warn">
+        This browser can't talk to serial devices. Use Chrome, Edge or Opera on a desktop computer,
+        or flash <a href="https://github.com/KamranAghlami/t-sdr-c5/releases/latest">the release image</a> with esptool.
+      </div>
+      <div slot="not-allowed" class="warn">Serial access needs a secure (https) page.</div>
+    </esp-web-install-button>
+    <p class="version">Firmware {{VERSION}} for ESP32-C5</p>
+  </section>
+
+  <section class="card">
+    <h2>Steps</h2>
+    <ol>
+      <li>Connect the board's antenna, then plug the board in over USB-C.</li>
+      <li>Click <b>Install</b> and choose the board's serial port (often "USB JTAG/serial debug unit").</li>
+      <li>Updating keeps your settings. Erase only for a clean install, if the page offers it.</li>
+      <li>If the board isn't detected, hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b> and try again.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>After installing</h2>
+    <p style="margin:0">Short presses on the two buttons step through channels; a long press on the USER button switches
+      between 2.4 and 5 GHz; a long press on BOOT opens the settings. The full guide is in the
+      <a href="https://github.com/KamranAghlami/t-sdr-c5#using-it">README</a>. The install dialog's
+      <b>Logs</b> view shows the board's serial output.</p>
+  </section>
+
+  <footer>
+    Receive-only firmware built on <a href="https://github.com/ESPARGOS/esp-sdr">ESP-SDR</a>.
+    <a href="https://github.com/KamranAghlami/t-sdr-c5">Source (GPL-3.0)</a>.
+  </footer>
+</main>
+</body>
+</html>

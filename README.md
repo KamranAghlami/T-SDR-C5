@@ -11,10 +11,12 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 [![CI](https://github.com/KamranAghlami/t-sdr-c5/actions/workflows/ci.yml/badge.svg)](https://github.com/KamranAghlami/t-sdr-c5/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/KamranAghlami/t-sdr-c5?include_prereleases)](https://github.com/KamranAghlami/t-sdr-c5/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-0a6fd6)](https://kamranaghlami.github.io/t-sdr-c5/)
 
 > **Status:** [v0.2.0](https://github.com/KamranAghlami/t-sdr-c5/releases/latest) is the full channel
 > view: fast capture, upper-5 GHz tuning, auto-level gain, settings menu and battery, all verified on
-> hardware. A band-survey view is next; see [the milestones](docs/SPEC.md#9-milestones).
+> hardware. Flash it [from the browser](https://kamranaghlami.github.io/t-sdr-c5/). A band-survey view is
+> next; see [the milestones](docs/SPEC.md#9-milestones).
 
 ## Features
 
@@ -47,20 +49,23 @@ The touch variant works too; touch is not used.
 
 ## Flashing
 
-1. Download `t-sdr-c5-<version>-merged.bin` from the
-   [latest release](https://github.com/KamranAghlami/t-sdr-c5/releases)
-   (or the `firmware` artifact of any [CI run](https://github.com/KamranAghlami/t-sdr-c5/actions)).
-2. Flash it at offset **`0x0`**:
-   - **Browser:** open [esptool-js](https://espressif.github.io/esptool-js/) in Chrome or Edge,
-     connect, add the file at `0x0` and program it.
-   - **Command line:**
-     ```sh
-     pipx run esptool --chip esp32c5 -p /dev/ttyACM0 write-flash 0x0 t-sdr-c5-<version>-merged.bin
-     ```
-3. If the board doesn't enter download mode, hold **BOOT**, tap **RST**, then release **BOOT**.
+**Easiest: [flash it from your browser](https://kamranaghlami.github.io/t-sdr-c5/)** in Chrome, Edge
+or Opera on a desktop. Plug the board in, click *Install* and pick its serial port. Updating this
+way keeps your settings.
 
-The release archive also contains the separate bootloader, partition table and app images
-with `flash_args` / `offsets.json`, if you would rather flash them individually.
+Without Web Serial, use esptool and the release image:
+
+1. Download `t-sdr-c5-<version>-merged.bin` from the
+   [latest release](https://github.com/KamranAghlami/t-sdr-c5/releases/latest).
+2. Flash it at offset **`0x0`**:
+   ```sh
+   pipx run esptool --chip esp32c5 -p /dev/ttyACM0 write-flash 0x0 t-sdr-c5-<version>-merged.bin
+   ```
+   The merged image also overwrites the settings area, which suits a fresh install. To update and keep
+   your settings, flash the separate images from the release archive instead:
+   `write-flash 0x2000 bootloader.bin 0x8000 partition-table.bin 0x10000 t_sdr_c5.bin`
+   (offsets are in `flash_args` / `offsets.json`).
+3. If the board doesn't enter download mode, hold **BOOT**, tap **RST**, then release **BOOT**.
 
 ## Using it
 

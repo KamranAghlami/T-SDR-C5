@@ -26,3 +26,6 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
 - Releases: tag `vX.Y.Z` on a commit **without** `[skip ci]` in its message —
   GitHub skips the tag push's workflow too. If it happens:
   `gh workflow run ci.yml --ref vX.Y.Z` (the release job keys off refs/tags/v*).
+- Browser flasher: `web/index.html` + `tools/web_manifest.py`, deployed to
+  GitHub Pages by the `pages` job on `v*` tags (environment `github-pages`
+  allows `v*` tags). It flashes the separate images so NVS survives updates.
