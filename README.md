@@ -50,8 +50,8 @@ The touch variant works too; touch is not used.
 ## Flashing
 
 **Easiest: [flash it from your browser](https://kamranaghlami.github.io/t-sdr-c5/)** in Chrome, Edge
-or Opera on a desktop. Plug the board in, click *Install* and pick its serial port. Updating this
-way keeps your settings.
+or Opera on a desktop. Plug the board in, pick a version (the latest is preselected), click
+*Install* and pick its serial port. Updating this way keeps your settings.
 
 Without Web Serial, use esptool and the release image:
 

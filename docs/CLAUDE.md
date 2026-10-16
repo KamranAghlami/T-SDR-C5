@@ -26,9 +26,10 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
 - Releases: tag `vX.Y.Z` on a commit **without** `[skip ci]` in its message —
   GitHub skips the tag push's workflow too. If it happens:
   `gh workflow run ci.yml --ref vX.Y.Z` (the release job keys off refs/tags/v*).
-- Browser flasher: `web/index.html` + `tools/web_manifest.py`, deployed to
-  GitHub Pages by the `pages` job on `v*` tags (environment `github-pages`
-  allows `v*` tags). It flashes the separate images so NVS survives updates.
+- Browser flasher: `web/index.html` + `tools/web_site.py`, deployed to GitHub
+  Pages by the `pages` job on `v*` tags, or by hand (`gh workflow run ci.yml
+  --ref main`). It offers every published release (version selector,
+  `?version=` preselects) and flashes the separate images so NVS survives.
 - The flasher's ESP Web Tools is built from a pinned upstream commit (ci.yml
   `web` job) because 10.4.0 bundles esptool-js 0.6.x, which can't detect
   ESP32-C5 rev 1.2 ("Failed to initialize"). Once a release > 10.4.0 ships

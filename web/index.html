@@ -37,7 +37,14 @@
       background: var(--card); border: 1px solid var(--border); border-radius: 12px;
       padding: 22px 22px 18px; margin-bottom: 20px;
     }
-    .version { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+    .field label { font-size: 0.9rem; color: var(--muted); }
+    select {
+      font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; max-width: 100%;
+    }
+    select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .notes { margin: 0 0 16px; font-size: 0.9rem; }
     ol { padding-left: 1.25rem; margin: 0; }
     li { margin: 6px 0; }
     h2 { font-size: 1.05rem; margin: 0 0 10px; }
@@ -78,7 +85,12 @@
   <p class="lede">A pocket Wi-Fi spectrum waterfall for the LilyGO T-Display-C5. Install it from your browser.</p>
 
   <section class="card">
-    <esp-web-install-button manifest="manifest.json">
+    <div class="field">
+      <label for="version">Firmware version</label>
+      <select id="version" disabled><option>Loading releases…</option></select>
+    </div>
+    <p class="notes"><a id="notes" href="https://github.com/KamranAghlami/t-sdr-c5/releases">Release notes</a></p>
+    <esp-web-install-button>
       <button slot="activate">Install t-sdr-c5</button>
       <div slot="unsupported" class="warn">
         This browser can't talk to serial devices. Use Chrome, Edge or Opera on a desktop computer,
@@ -86,7 +98,6 @@
       </div>
       <div slot="not-allowed" class="warn">Serial access needs a secure (https) page.</div>
     </esp-web-install-button>
-    <p class="version">Firmware {{VERSION}} for ESP32-C5</p>
   </section>
 
   <section class="card">
@@ -106,6 +117,43 @@
       <a href="https://github.com/KamranAghlami/t-sdr-c5#using-it">README</a>. The install dialog's
       <b>Logs</b> view shows the board's serial output.</p>
   </section>
+
+  <script type="module">
+    // Lists every release (versions.json, newest first) and points the install
+    // button at the chosen one's manifest. ?version=vX.Y.Z preselects a release.
+    const select = document.getElementById('version');
+    const notes = document.getElementById('notes');
+    const button = document.querySelector('esp-web-install-button');
+    const releaseUrl = (v) => `https://github.com/KamranAghlami/t-sdr-c5/releases/tag/${encodeURIComponent(v)}`;
+
+    function choose(version) {
+      const manifest = `manifests/${encodeURIComponent(version)}.json`;
+      button.setAttribute('manifest', manifest);
+      button.manifest = manifest;
+      notes.href = releaseUrl(version);
+      notes.textContent = `Release notes for ${version}`;
+    }
+
+    try {
+      const versions = await (await fetch('versions.json', { cache: 'no-cache' })).json();
+      const wanted = new URLSearchParams(location.search).get('version');
+      const fallback = versions.find((v) => v.latest) ?? versions.find((v) => !v.prerelease) ?? versions[0];
+      const initial = versions.find((v) => v.version === wanted) ?? fallback;
+
+      select.replaceChildren(...versions.map((v) => {
+        const tags = [v.latest && 'latest', v.prerelease && 'pre-release'].filter(Boolean);
+        const option = new Option(`${v.version}${tags.length ? ` (${tags.join(', ')})` : ''} · ${v.date}`, v.version);
+        option.selected = v === initial;
+        return option;
+      }));
+      select.disabled = false;
+      select.addEventListener('change', () => choose(select.value));
+      choose(initial.version);
+    } catch (error) {
+      select.replaceChildren(new Option('Could not load releases'));
+      console.error(error);
+    }
+  </script>
 
   <footer>
     Receive-only firmware built on <a href="https://github.com/ESPARGOS/esp-sdr">ESP-SDR</a>.

@@ -156,8 +156,9 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
 
-  # Browser flasher (ESP Web Tools) on GitHub Pages. On a tag it serves that
-  # release; a manual run on a branch rebuilds the page around the latest one.
+  # Browser flasher (ESP Web Tools) on GitHub Pages, offering every release
+  # (newest first, GitHub's latest preselected). Runs after a tag's release is
+  # published; a manual run on a branch redeploys the page.
   pages:
     if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
     needs: [release, web]
@@ -177,24 +178,26 @@ jobs:
           name: esp-web-tools
           path: esp-web-tools
 
-      - name: Fetch release images
+      - name: Fetch every release
         env:
           GH_TOKEN: ${{ github.token }}
-          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="$REF_NAME"; else version=$(gh release view --json tagName --jq .tagName); fi
-          gh release download "$version" --pattern "t-sdr-c5-$version.tar.gz" --dir dist
-          tar -xzf "dist/t-sdr-c5-$version.tar.gz" -C dist
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          gh release list --exclude-drafts --limit 100 --json tagName,isPrerelease,isLatest,publishedAt > releases.json
+          mkdir -p dist
+          for tag in $(jq -r '.[].tagName' releases.json); do
+            if gh release download "$tag" --pattern "t-sdr-c5-$tag.tar.gz" --dir dist; then
+              tar -xzf "dist/t-sdr-c5-$tag.tar.gz" -C dist
+            else
+              echo "::warning::$tag has no firmware archive"
+            fi
+          done
 
       - name: Build site
         run: |
-          mkdir -p site/firmware
-          cp dist/t-sdr-c5-$VERSION/*.bin site/firmware/
-          python3 -I tools/web_manifest.py "dist/t-sdr-c5-$VERSION/offsets.json" --version "$VERSION" > site/manifest.json
-          sed "s/{{VERSION}}/$VERSION/" web/index.html > site/index.html
+          python3 -I tools/web_site.py releases.json dist site
+          cp web/index.html site/index.html
           cp -r esp-web-tools site/esp-web-tools
-          cat site/manifest.json
+          cat site/versions.json
 
       - uses: actions/upload-pages-artifact@v3
         with:
