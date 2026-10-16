@@ -33,3 +33,7 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
   `web` job) because 10.4.0 bundles esptool-js 0.6.x, which can't detect
   ESP32-C5 rev 1.2 ("Failed to initialize"). Once a release > 10.4.0 ships
   esptool-js >= 0.7.0, drop the job and load it from unpkg again.
+- Logs: release builds are WARN level. For per-second measurements (lines/s,
+  captures/line, per-phase timing, battery) build with
+  `CONFIG_T_SDR_C5_STATS_LOG=y` (e.g. `idf.py menuconfig` or a CI branch with an
+  extra sdkconfig line).

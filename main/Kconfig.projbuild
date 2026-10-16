@@ -1,0 +1,11 @@
+menu "t-sdr-c5"
+
+    config T_SDR_C5_STATS_LOG
+        bool "Log capture statistics once per second"
+        default n
+        help
+            Prints lines/s, captures per line, per-phase timing, failures,
+            recalibrations, gain and battery readings to the console every
+            second. Useful for measurements; off in release builds.
+
+endmenu

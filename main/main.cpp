@@ -31,6 +31,11 @@ namespace
     constexpr int64_t idle_refresh_us = 200'000;
     constexpr int64_t save_delay_us = 2'000'000;
     constexpr TickType_t battery_period = pdMS_TO_TICKS(5000);
+#ifdef CONFIG_T_SDR_C5_STATS_LOG
+    constexpr bool stats_log = true;
+#else
+    constexpr bool stats_log = false;
+#endif
 
     board::lcd lcd;
     board::buttons buttons;
@@ -255,11 +260,11 @@ namespace
             }
 
             const uint32_t *words;
-            const uint32_t t0 = esp_cpu_get_cycle_count();
+            const uint32_t t0 = stats_log ? esp_cpu_get_cycle_count() : 0;
 
             if (c5_radio_capture(core::fft_size, C5_RATE_80M, &words, nullptr) == ESP_OK)
             {
-                const uint32_t t1 = esp_cpu_get_cycle_count();
+                const uint32_t t1 = stats_log ? esp_cpu_get_cycle_count() : 0;
 
                 gain = static_cast<uint8_t>((words[0] >> 20) & 0x7f);
                 const auto block = core::prepare_iq(words, core::fft_size, window.data(), fft.order(), samples);
@@ -267,9 +272,12 @@ namespace
                 line_peak = std::max(line_peak, block.peak);
                 fft.forward_permuted(samples);
                 accumulator.add(samples, block.scale);
-                capture_cycles += t1 - t0;
-                dsp_cycles += esp_cpu_get_cycle_count() - t1;
-                timed++;
+                if (stats_log)
+                {
+                    capture_cycles += t1 - t0;
+                    dsp_cycles += esp_cpu_get_cycle_count() - t1;
+                    timed++;
+                }
             }
 
             now = esp_timer_get_time();
@@ -303,27 +311,31 @@ namespace
 
             if (now - rate_start >= 1'000'000)
             {
-                c5_radio_stats_t stats;
-
-                c5_radio_get_stats(&stats);
                 f.lines_per_s = static_cast<uint16_t>(lines);
-                constexpr unsigned mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
-                const auto per_capture_us = [&](uint64_t cycles) {
-                    return static_cast<unsigned>(timed ? cycles / timed / mhz : 0);
-                };
 
-                ESP_LOGI(tag,
-                         "%u lines/s, %u captures/line (capture %u us, dsp %u us, ui %u us/frame), %u failures, "
-                         "%u recalibrations, gain %u, peak %u, SRAM %u, battery %u mV %d mA",
-                         lines, f.captures, per_capture_us(capture_cycles), per_capture_us(dsp_cycles),
-                         static_cast<unsigned>(renderer.render_us()),
-                         static_cast<unsigned>(stats.failures - last_stats.failures),
-                         static_cast<unsigned>(stats.recalibrations - last_stats.recalibrations), gain, second_peak,
-                         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), f.battery.millivolts,
-                         f.battery.milliamps);
-                capture_cycles = dsp_cycles = 0;
-                timed = 0;
-                last_stats = stats;
+                if (stats_log)
+                {
+                    c5_radio_stats_t stats;
+                    constexpr unsigned mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
+                    const auto per_capture_us = [&](uint64_t cycles) {
+                        return static_cast<unsigned>(timed ? cycles / timed / mhz : 0);
+                    };
+
+                    c5_radio_get_stats(&stats);
+                    ESP_LOGI(tag,
+                             "%u lines/s, %u captures/line (capture %u us, dsp %u us, ui %u us/frame), %u failures, "
+                             "%u recalibrations, gain %u, peak %u, SRAM %u, battery %u mV %d mA",
+                             lines, f.captures, per_capture_us(capture_cycles), per_capture_us(dsp_cycles),
+                             static_cast<unsigned>(renderer.render_us()),
+                             static_cast<unsigned>(stats.failures - last_stats.failures),
+                             static_cast<unsigned>(stats.recalibrations - last_stats.recalibrations), gain, second_peak,
+                             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                             f.battery.millivolts, f.battery.milliamps);
+                    last_stats = stats;
+                    capture_cycles = dsp_cycles = 0;
+                    timed = 0;
+                }
+
                 lines = 0;
                 second_peak = 0;
                 rate_start = now;

@@ -39,3 +39,7 @@ CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 
 # The PSRAM self-test adds about 1 s to every boot (verified good on hardware).
 # CONFIG_SPIRAM_MEMTEST is not set
+
+# Release builds log warnings and errors only. Per-second statistics:
+# CONFIG_T_SDR_C5_STATS_LOG=y (menuconfig > t-sdr-c5).
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
