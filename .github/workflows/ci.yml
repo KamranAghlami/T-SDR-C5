@@ -75,7 +75,8 @@ jobs:
           source .esp-idf/export.sh
           defaults="sdkconfig.defaults"
           if [ "$VARIANT" = stats ]; then
-            echo "CONFIG_T_SDR_C5_STATS_LOG=y" > sdkconfig.stats
+            # The statistics are INFO messages; release builds compile those out.
+            printf 'CONFIG_T_SDR_C5_STATS_LOG=y\nCONFIG_LOG_DEFAULT_LEVEL_INFO=y\n' > sdkconfig.stats
             defaults="$defaults;sdkconfig.stats"
           fi
           idf.py -B build -DSDKCONFIG_DEFAULTS="$defaults" build

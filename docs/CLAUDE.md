@@ -36,5 +36,5 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
   esptool-js >= 0.7.0, drop the job and load it from unpkg again.
 - Logs: release builds are WARN level. For per-second measurements (lines/s,
   captures/line, per-phase timing, battery) build with
-  `CONFIG_T_SDR_C5_STATS_LOG=y` (e.g. `idf.py menuconfig` or a CI branch with an
-  extra sdkconfig line).
+  `CONFIG_T_SDR_C5_STATS_LOG=y` and `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` (the
+  release WARN level compiles INFO out). CI's `firmware-stats` artifact is that build.

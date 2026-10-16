@@ -6,6 +6,7 @@ menu "t-sdr-c5"
         help
             Prints lines/s, captures per line, per-phase timing, failures,
             recalibrations, gain and battery readings to the console every
-            second. Useful for measurements; off in release builds.
+            second. Useful for measurements; off in release builds. They are
+            INFO messages, so also set the default log level to Info.
 
 endmenu
