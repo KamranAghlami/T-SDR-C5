@@ -518,6 +518,83 @@ namespace
         CHECK(line.captures() == 0);
     }
 
+    // Every step sees the same passband hump; the survey must learn and remove
+    // it, while a signal present in one step only stays visible.
+    void test_survey_passband()
+    {
+        const unsigned n = core::fft_size;
+        const auto plan = core::make_survey_plan(core::band::ghz24);
+        core::survey_accumulator line;
+        std::vector<int16_t> spectrum(2 * n);
+        std::vector<uint8_t> peak(320), mean(320);
+        uint32_t seed = 7;
+        const auto uniform = [&] {
+            seed = seed * 1664525u + 1013904223u;
+            return (seed >> 8) / 16777216.0;
+        };
+        const int tone_px = core::survey_pixel(plan, 320, 2470);
+
+        line.configure(plan, n, core::sample_rate_hz, 320);
+
+        for (int l = 0; l < 60; l++)
+        {
+            for (unsigned step = 0; step < plan.centres_mhz.size(); step++)
+                for (int c = 0; c < 6; c++)
+                {
+                    std::fill(spectrum.begin(), spectrum.end(), 0);
+
+                    for (unsigned k = 0; k < n; k++)
+                    {
+                        const int offset = static_cast<int>(k < n / 2 ? k : k - n); // bins from DC
+                        const double hump_db = -10.0 * (offset / 256.0) * (offset / 256.0);
+                        double power = 400.0 * std::pow(10.0, hump_db / 10) * (0.5 + uniform());
+
+                        // +10 MHz in the second step (2470 MHz): a strong carrier.
+                        if (step == 1 && offset == 128)
+                            power *= 100;
+
+                        spectrum[2 * k] = static_cast<int16_t>(std::lround(std::sqrt(power)));
+                    }
+
+                    line.add(spectrum.data(), core::max_scale - 4, step); // x256: realistic levels
+                }
+
+            line.finish(peak.data(), mean.data());
+        }
+
+        // Ignore the tone and a pixel either side of it.
+        uint8_t lo = 255, hi = 0;
+
+        for (int x = 0; x < 320; x++)
+            if (std::abs(x - tone_px) > 1)
+            {
+                lo = std::min(lo, mean[x]);
+                hi = std::max(hi, mean[x]);
+            }
+
+        std::printf("survey passband: flat floor %u..%u codes, tone %u codes\n", lo, hi, mean[tone_px]);
+        CHECK(hi - lo <= 4);                  // within 2 dB after correction (the hump was 10 dB)
+        // The 20 dB single-bin carrier shares its pixel with 3 noise bins (-6 dB in
+        // the mean): it must stay at least 12 dB clear of the corrected floor.
+        CHECK(mean[tone_px] >= hi + 24);
+        CHECK(*std::min_element(mean.begin(), mean.end()) > 0); // guard pixels were filled
+    }
+
+    void test_exp2_log2()
+    {
+        CHECK(core::exp2_q8(0) == 256);
+        CHECK(core::exp2_q8(256) == 512);
+        CHECK(core::exp2_q8(-256) == 128);
+        CHECK(core::log2_q8(1024) == 10 * 256);
+
+        for (int32_t x = -1024; x <= 1024; x += 37)
+        {
+            const double expected = 256.0 * std::exp2(x / 256.0);
+
+            CHECK(std::abs(core::exp2_q8(x) - expected) <= 1.0);
+        }
+    }
+
     void test_colormap()
     {
         // Turbo is blue at a quarter and red at the top; values are byte-swapped RGB565.
@@ -545,6 +622,8 @@ int main()
     test_menu();
     test_survey_plan();
     test_survey_accumulator();
+    test_survey_passband();
+    test_exp2_log2();
     test_colormap();
 
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);

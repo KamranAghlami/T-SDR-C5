@@ -33,6 +33,9 @@ namespace ui
         constexpr uint16_t menu_bg = core::rgb565(10, 14, 24);
         constexpr uint16_t menu_selected = core::rgb565(0, 70, 120);
         constexpr int menu_row_h = 22;
+        // Axis rows: cursor bar 0-1, labels 2-8, ticks 10-11 (pointing at the waterfall).
+        constexpr int label_row = 2;
+        constexpr int tick_row = 10;
 
         // Draws row `gy` (0 = top) of `text` at scale `scale` into a pixel row.
         void text_row(uint16_t *row, int gy, int x, const char *text, int scale, uint16_t colour)
@@ -331,14 +334,14 @@ namespace ui
                 if (x < 0 || x >= width)
                     continue;
 
-                if (r >= 2 && r < 4)
+                if (r >= tick_row)
                     row[x] = grey;
 
                 std::snprintf(label, sizeof(label), "%d", mhz);
 
                 const int lx = std::clamp(x - text_width(label, 1) / 2, 0, width - text_width(label, 1));
 
-                text_row(row, r - 4, lx, label, 1, grey);
+                text_row(row, r - label_row, lx, label, 1, grey);
             }
         }
     }
@@ -404,11 +407,11 @@ namespace ui
             {
                 const int x = x_of(channels[i].mhz);
 
-                if (r >= 2 && r < 4 && x >= 0 && x < width)
+                if (r >= tick_row && x >= 0 && x < width)
                     row[x] = labels[i].cursor ? white : grey;
 
                 if (shown[i])
-                    text_row(row, r - 4, labels[i].x, labels[i].text, 1, labels[i].cursor ? white : grey);
+                    text_row(row, r - label_row, labels[i].x, labels[i].text, 1, labels[i].cursor ? white : grey);
             }
         }
     }

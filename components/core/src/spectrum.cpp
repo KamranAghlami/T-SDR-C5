@@ -34,21 +34,51 @@ namespace core
         }
     }
 
+    uint32_t log2_q8(uint64_t value)
+    {
+        if (!value)
+            return 0;
+
+        const unsigned exponent = 63u - static_cast<unsigned>(__builtin_clzll(value));
+        const unsigned fraction = exponent >= 8 ? static_cast<unsigned>(value >> (exponent - 8)) & 255u
+                                                : static_cast<unsigned>(value << (8 - exponent)) & 255u;
+
+        return exponent * 256u + log2_fraction_q8()[fraction];
+    }
+
+    uint32_t exp2_q8(int32_t log2_q8_value)
+    {
+        // round(65536 * 2^(i / 256)) for the fractional part.
+        static const auto table = [] {
+            std::array<uint32_t, 256> t{};
+
+            for (unsigned i = 0; i < 256; i++)
+                t[i] = static_cast<uint32_t>(std::lround(65536.0 * std::exp2(i / 256.0)));
+
+            return t;
+        }();
+        const int32_t whole = log2_q8_value >> 8; // floor
+        const uint32_t mantissa = table[static_cast<unsigned>(log2_q8_value) & 255u]; // 2^frac in Q16
+        const int shift = 8 + whole - 16; // result in Q8
+
+        if (shift >= 0)
+            return shift > 15 ? UINT32_MAX : mantissa << shift;
+
+        return shift < -31 ? 0 : (mantissa + (1u << (-shift - 1))) >> -shift;
+    }
+
     uint8_t power_code(uint64_t power, unsigned bias_log2)
     {
         if (!power)
             return 0;
 
-        const unsigned exponent = 63u - static_cast<unsigned>(__builtin_clzll(power));
-        const unsigned fraction = exponent >= 8 ? static_cast<unsigned>(power >> (exponent - 8)) & 255u
-                                                : static_cast<unsigned>(power << (8 - exponent)) & 255u;
-        const uint32_t log2_q8 = exponent * 256u + log2_fraction_q8()[fraction];
+        const uint32_t level = log2_q8(power);
 
-        if (log2_q8 <= bias_log2 * 256u)
+        if (level <= bias_log2 * 256u)
             return 0;
 
         // 2 * 10*log10(2) * 2^16 / 256 = 1541.1
-        const uint32_t code = ((log2_q8 - bias_log2 * 256u) * 1541u + 32768u) >> 16;
+        const uint32_t code = ((level - bias_log2 * 256u) * 1541u + 32768u) >> 16;
 
         return static_cast<uint8_t>(std::min<uint32_t>(code, 255));
     }

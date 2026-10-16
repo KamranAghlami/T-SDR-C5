@@ -12,6 +12,12 @@ namespace core
         mean,
     };
 
+    // log2(value) in Q8 (0 for 0), piecewise linear, within 0.01.
+    uint32_t log2_q8(uint64_t value);
+
+    // round(256 * 2^(x / 256)): the inverse of log2_q8, as a Q8 factor.
+    uint32_t exp2_q8(int32_t x);
+
     // Power in 0.5 dB steps: 2 * 10*log10(power / 2^bias_log2), clamped to
     // 0..255. Within 0.3 dB including the 0.5 dB quantization.
     uint8_t power_code(uint64_t power, unsigned bias_log2 = 0);
