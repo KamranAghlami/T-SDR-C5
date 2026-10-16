@@ -21,6 +21,7 @@
 #include "core/menu.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
+#include "core/survey.hpp"
 #include "settings.hpp"
 #include "ui/renderer.hpp"
 
@@ -95,6 +96,7 @@ namespace
                 {
                     e.save = true;
                     e.respan = item == core::menu_item::span;
+                    e.retune = item == core::menu_item::view;
                     e.regain = item == core::menu_item::gain;
                     e.brightness = item == core::menu_item::brightness;
                 }
@@ -122,7 +124,9 @@ namespace
         case core::gesture::short_b:
             index = static_cast<uint8_t>(core::step_channel(state.band, index, g == core::gesture::short_a ? -1 : 1));
             state.frozen = false;
-            e.retune = e.save = true;
+            // In the band view this only moves the cursor; the sweep is unchanged.
+            e.retune = state.view == core::view_id::channel;
+            e.save = true;
             break;
 
         case core::gesture::long_a:
@@ -171,6 +175,8 @@ namespace
         const auto window = core::hann_q15(core::fft_size);
         auto *samples = static_cast<int16_t *>(heap_caps_malloc(core::fft_size * 4, MALLOC_CAP_INTERNAL));
         core::line_accumulator accumulator;
+        core::survey_plan plan;
+        core::survey_accumulator survey;
         core::auto_level leveller;
         static ui::frame f;
 
@@ -184,8 +190,8 @@ namespace
         int64_t next_line = 0, save_at = 0, rate_start = esp_timer_get_time(), last_frame = 0;
         unsigned lines = 0, line_peak = 0, second_peak = 0;
         // CPU cycles spent per phase during the current second, for the log.
-        uint64_t capture_cycles = 0, dsp_cycles = 0;
-        unsigned timed = 0;
+        uint64_t capture_cycles = 0, dsp_cycles = 0, tune_cycles = 0;
+        unsigned timed = 0, tunes = 0;
         uint8_t gain = 0;
         c5_radio_stats_t last_stats;
 
@@ -221,10 +227,18 @@ namespace
 
             if (retune)
             {
-                const unsigned mhz = state.current_channel().mhz;
+                if (state.view == core::view_id::band)
+                {
+                    plan = core::make_survey_plan(state.band);
+                    survey.configure(plan, core::fft_size, core::sample_rate_hz, ui::width);
+                }
+                else
+                {
+                    const unsigned mhz = state.current_channel().mhz;
 
-                if (c5_radio_tune(mhz) != ESP_OK)
-                    ESP_LOGW(tag, "tune %u MHz failed", mhz);
+                    if (c5_radio_tune(mhz) != ESP_OK)
+                        ESP_LOGW(tag, "tune %u MHz failed", mhz);
+                }
 
                 // Retuning reprograms the receiver; restore the gain setting.
                 leveller.reset();
@@ -259,35 +273,72 @@ namespace
                 continue;
             }
 
-            const uint32_t *words;
-            const uint32_t t0 = stats_log ? esp_cpu_get_cycle_count() : 0;
+            // One snapshot: capture, condition, FFT, then hand the spectrum on.
+            const auto capture_once = [&](auto &&add) {
+                const uint32_t *words;
+                const uint32_t t0 = stats_log ? esp_cpu_get_cycle_count() : 0;
 
-            if (c5_radio_capture(core::fft_size, C5_RATE_80M, &words, nullptr) == ESP_OK)
-            {
+                if (c5_radio_capture(core::fft_size, C5_RATE_80M, &words, nullptr) != ESP_OK)
+                    return;
+
                 const uint32_t t1 = stats_log ? esp_cpu_get_cycle_count() : 0;
-
-                gain = static_cast<uint8_t>((words[0] >> 20) & 0x7f);
                 const auto block = core::prepare_iq(words, core::fft_size, window.data(), fft.order(), samples);
 
+                gain = static_cast<uint8_t>((words[0] >> 20) & 0x7f);
                 line_peak = std::max(line_peak, block.peak);
                 fft.forward_permuted(samples);
-                accumulator.add(samples, block.scale);
+                add(samples, block.scale);
+
                 if (stats_log)
                 {
                     capture_cycles += t1 - t0;
                     dsp_cycles += esp_cpu_get_cycle_count() - t1;
                     timed++;
                 }
+            };
+
+            if (state.view == core::view_id::band)
+            {
+                // One sweep per line; each step gets an equal share of the line
+                // period and at least one snapshot.
+                const int64_t slice = line_period_us / static_cast<int64_t>(plan.centres_mhz.size());
+
+                for (unsigned step = 0; step < plan.centres_mhz.size(); step++)
+                {
+                    const uint32_t t0 = stats_log ? esp_cpu_get_cycle_count() : 0;
+                    const int64_t step_end = esp_timer_get_time() + slice;
+
+                    c5_radio_tune_fast(plan.centres_mhz[step]);
+
+                    if (stats_log)
+                    {
+                        tune_cycles += esp_cpu_get_cycle_count() - t0;
+                        tunes++;
+                    }
+
+                    do
+                        capture_once([&](const int16_t *spectrum, unsigned scale) { survey.add(spectrum, scale, step); });
+                    while (esp_timer_get_time() < step_end);
+                }
+
+                now = esp_timer_get_time();
+                f.captures = static_cast<uint16_t>(survey.captures());
+                f.radio_error = f.captures == 0;
+                survey.finish(f.peak.data(), f.mean.data());
+            }
+            else
+            {
+                capture_once([&](const int16_t *spectrum, unsigned scale) { accumulator.add(spectrum, scale); });
+                now = esp_timer_get_time();
+
+                if (now < next_line)
+                    continue;
+
+                f.captures = static_cast<uint16_t>(accumulator.count());
+                f.radio_error = f.captures == 0;
+                accumulator.finish(f.peak.data(), f.mean.data(), ui::width);
             }
 
-            now = esp_timer_get_time();
-
-            if (now < next_line)
-                continue;
-
-            f.captures = static_cast<uint16_t>(accumulator.count());
-            f.radio_error = f.captures == 0;
-            accumulator.finish(f.peak.data(), f.mean.data(), ui::width);
             f.state = state;
             f.new_line = true;
             f.gain = gain;
@@ -323,17 +374,18 @@ namespace
 
                     c5_radio_get_stats(&stats);
                     ESP_LOGI(tag,
-                             "%u lines/s, %u captures/line (capture %u us, dsp %u us, ui %u us/frame), %u failures, "
-                             "%u recalibrations, gain %u, peak %u, SRAM %u, battery %u mV %d mA",
+                             "%u lines/s, %u captures/line (capture %u us, dsp %u us, tune %u us, ui %u us/frame), "
+                             "%u failures, %u recalibrations, gain %u, peak %u, SRAM %u, battery %u mV %d mA",
                              lines, f.captures, per_capture_us(capture_cycles), per_capture_us(dsp_cycles),
+                             static_cast<unsigned>(tunes ? tune_cycles / tunes / mhz : 0),
                              static_cast<unsigned>(renderer.render_us()),
                              static_cast<unsigned>(stats.failures - last_stats.failures),
                              static_cast<unsigned>(stats.recalibrations - last_stats.recalibrations), gain, second_peak,
                              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
                              f.battery.millivolts, f.battery.milliamps);
                     last_stats = stats;
-                    capture_cycles = dsp_cycles = 0;
-                    timed = 0;
+                    capture_cycles = dsp_cycles = tune_cycles = 0;
+                    timed = tunes = 0;
                 }
 
                 lines = 0;

@@ -26,8 +26,6 @@ namespace core
             return table;
         }
 
-        // Normalized powers span about 2^12 (0.5 LSB rms noise) to 2^42 (a
-        // full-scale tone); this bias keeps their codes within 0..255.
         constexpr unsigned code_bias_log2 = 12;
 
         inline int32_t field(uint32_t word, unsigned shift)
@@ -54,6 +52,8 @@ namespace core
 
         return static_cast<uint8_t>(std::min<uint32_t>(code, 255));
     }
+
+    uint8_t spectrum_code(uint64_t normalized_power) { return power_code(normalized_power, code_bias_log2); }
 
     std::vector<int16_t> hann_q15(unsigned n)
     {
@@ -155,8 +155,8 @@ namespace core
                 s = std::max(s, m_sum[b]);
             }
 
-            peak[x] = power_code(p, code_bias_log2);
-            mean[x] = power_code(s / count, code_bias_log2);
+            peak[x] = spectrum_code(p);
+            mean[x] = spectrum_code(s / count);
         }
 
         reset();

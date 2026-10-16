@@ -16,6 +16,7 @@
 #include "core/menu.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
+#include "core/survey.hpp"
 
 namespace
 {
@@ -421,6 +422,11 @@ namespace
         core::state s;
         char value[24];
 
+        CHECK(core::menu_change(s, core::menu_item::view, 80) && s.view == core::view_id::band);
+        CHECK(!core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 40);
+        core::menu_value(s, core::menu_item::span, value, sizeof(value), nullptr);
+        CHECK(std::string(value) == "Whole band");
+        CHECK(core::menu_change(s, core::menu_item::view, 80) && s.view == core::view_id::channel);
         CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 80);
         CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 20);
 
@@ -451,6 +457,67 @@ namespace
             CHECK(core::menu_label(item)[0] != '\0');
     }
 
+    void test_survey_plan()
+    {
+        const auto p24 = core::make_survey_plan(core::band::ghz24);
+        const auto p5 = core::make_survey_plan(core::band::ghz5);
+
+        CHECK(p24.centres_mhz == std::vector<uint16_t>({2420, 2460, 2500}));
+        CHECK(p5.centres_mhz.size() == 19);
+        CHECK(p5.centres_mhz.front() == 5170 && p5.centres_mhz.back() == 5890);
+        CHECK(core::survey_pixel(p24, 320, 2400) == 0);
+        CHECK(core::survey_pixel(p24, 320, 2437) == 118);
+        CHECK(core::survey_pixel(p24, 320, 2500) == -1);
+        // Every channel of each band is on its line.
+        for (const auto &c : core::channels_24)
+            CHECK(core::survey_pixel(p24, 320, c.mhz) >= 0);
+        for (const auto &c : core::channels_5)
+            CHECK(core::survey_pixel(p5, 320, c.mhz) >= 0);
+    }
+
+    // A tone 5 MHz above the second step's centre lands on its pixel; every
+    // pixel of the line is covered by some step.
+    void test_survey_accumulator()
+    {
+        const unsigned n = core::fft_size;
+        const core::fft_q15 fft(core::fft_log2);
+        const auto window = core::hann_q15(n);
+        const auto plan = core::make_survey_plan(core::band::ghz24);
+        std::vector<uint32_t> words(n), quiet(n, 0);
+        std::vector<int16_t> samples(2 * n), silence(2 * n, 0);
+        core::survey_accumulator line;
+        std::vector<uint8_t> peak(320), mean(320);
+
+        for (unsigned j = 0; j < n; j++)
+            words[j] = dump_word(2 * pi * 5e6 * j / core::sample_rate_hz, 200);
+
+        line.configure(plan, n, core::sample_rate_hz, 320);
+
+        for (unsigned step = 0; step < plan.centres_mhz.size(); step++)
+        {
+            const auto block = core::prepare_iq(step == 1 ? words.data() : quiet.data(), n, window.data(), fft.order(),
+                                                samples.data());
+
+            fft.forward_permuted(samples.data());
+            line.add(samples.data(), block.scale, step);
+        }
+
+        CHECK(line.captures() == 3);
+        line.finish(peak.data(), mean.data());
+
+        unsigned best = 0;
+
+        for (unsigned x = 0; x < 320; x++)
+            if (peak[x] > peak[best])
+                best = x;
+
+        const int expected = core::survey_pixel(plan, 320, 2465);
+
+        std::printf("survey: tone at pixel %u (expected %d)\n", best, expected);
+        CHECK(std::abs(static_cast<int>(best) - expected) <= 1);
+        CHECK(line.captures() == 0);
+    }
+
     void test_colormap()
     {
         // Turbo is blue at a quarter and red at the top; values are byte-swapped RGB565.
@@ -476,6 +543,8 @@ int main()
     test_gestures();
     test_auto_level();
     test_menu();
+    test_survey_plan();
+    test_survey_accumulator();
     test_colormap();
 
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);

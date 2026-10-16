@@ -11,16 +11,19 @@
     :root {
       --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #5b6270; --border: #dde1e7;
       --accent: #0a6fd6; --accent-text: #ffffff; --warn-bg: #fff5e0; --warn-text: #6b4a00;
+      --field: #eef1f5;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
         --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
         --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
+        --field: #222733;
       }
     }
     :root[data-theme="dark"] {
       --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
       --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
+      --field: #222733;
     }
     * { box-sizing: border-box; }
     body {
@@ -46,6 +49,27 @@
       padding: 12px 22px; font: inherit; font-weight: 600; cursor: pointer;
     }
     footer { color: var(--muted); font-size: 0.85rem; }
+
+    /* ESP Web Tools' install and log dialogs (Material Web in a shadow root):
+       page styles on the host element override its :host defaults. */
+    ewt-install-dialog {
+      --roboto-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --text-color: var(--muted);
+      --danger-color: #d93025;
+      --md-sys-color-primary: var(--accent);
+      --md-sys-color-on-primary: var(--accent-text);
+      --md-sys-color-surface: var(--card);
+      --md-sys-color-surface-container: var(--card);
+      --md-sys-color-surface-container-high: var(--card);
+      --md-sys-color-surface-container-highest: var(--field);
+      --md-sys-color-secondary-container: var(--field);
+      --md-sys-color-on-surface: var(--text);
+      --md-sys-color-on-surface-variant: var(--muted);
+      --md-sys-color-outline: var(--border);
+      --md-sys-color-outline-variant: var(--border);
+      --md-sys-color-scrim: #000;
+      --md-sys-color-error: #d93025;
+    }
   </style>
 </head>
 <body>

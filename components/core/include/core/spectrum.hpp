@@ -16,6 +16,11 @@ namespace core
     // 0..255. Within 0.3 dB including the 0.5 dB quantization.
     uint8_t power_code(uint64_t power, unsigned bias_log2 = 0);
 
+    // Display code of a power normalized to max_scale (see line_accumulator):
+    // such powers span about 2^12 (0.5 LSB rms noise) to 2^42 (a full-scale
+    // tone), and the bias keeps their codes within 0..255.
+    uint8_t spectrum_code(uint64_t normalized_power);
+
     // Hann window in Q15, peak 32767.
     std::vector<int16_t> hann_q15(unsigned n);
 

@@ -22,6 +22,12 @@ namespace core
         return static_cast<unsigned>(static_cast<uint64_t>(span_mhz) * 1'000'000 * fft_size / sample_rate_hz);
     }
 
+    enum class view_id : uint8_t
+    {
+        channel, // one channel, 20/40/80 MHz span
+        band,    // the whole band, stitched from several captures
+    };
+
     enum class colormap_id : uint8_t
     {
         turbo,
@@ -31,7 +37,9 @@ namespace core
     // Everything the user can change; owned by the control loop.
     struct state
     {
+        core::view_id view = core::view_id::channel;
         core::band band = core::band::ghz24;
+        // Selected channel per band; in the band view it is the cursor.
         std::array<uint8_t, 2> channel_index = {5, 0}; // ch 6, ch 36
         uint8_t span_mhz = 40;
         core::detector detector = core::detector::peak;

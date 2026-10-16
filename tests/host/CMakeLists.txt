@@ -12,7 +12,8 @@ add_executable(core_tests
     "${core}/src/gain.cpp"
     "${core}/src/gestures.cpp"
     "${core}/src/menu.cpp"
-    "${core}/src/spectrum.cpp")
+    "${core}/src/spectrum.cpp"
+    "${core}/src/survey.cpp")
 target_include_directories(core_tests PRIVATE "${core}/include")
 target_compile_options(core_tests PRIVATE -Wall -Wextra -Werror -fsanitize=address,undefined)
 target_link_options(core_tests PRIVATE -fsanitize=address,undefined)

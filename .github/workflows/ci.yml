@@ -29,6 +29,11 @@ jobs:
   firmware:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # stats: the same firmware with the per-second statistics log, for measurements.
+        variant: [release, stats]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,9 +69,16 @@ jobs:
         run: .esp-idf/install.sh esp32c5
 
       - name: Build
+        env:
+          VARIANT: ${{ matrix.variant }}
         run: |
           source .esp-idf/export.sh
-          idf.py -B build build
+          defaults="sdkconfig.defaults"
+          if [ "$VARIANT" = stats ]; then
+            echo "CONFIG_T_SDR_C5_STATS_LOG=y" > sdkconfig.stats
+            defaults="$defaults;sdkconfig.stats"
+          fi
+          idf.py -B build -DSDKCONFIG_DEFAULTS="$defaults" build
           idf.py -B build merge-bin -o "$PWD/build/merged.bin"
 
       - name: Check SRAM headroom
@@ -89,7 +101,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: firmware
+          name: ${{ matrix.variant == 'release' && 'firmware' || 'firmware-stats' }}
           path: dist/
           if-no-files-found: error
           retention-days: 30
@@ -144,12 +156,14 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
 
-  # Browser flasher (ESP Web Tools) for the tagged release on GitHub Pages.
+  # Browser flasher (ESP Web Tools) on GitHub Pages. On a tag it serves that
+  # release; a manual run on a branch rebuilds the page around the latest one.
   pages:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') }}
     needs: [release, web]
     runs-on: ubuntu-24.04
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -160,19 +174,21 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: firmware
-          path: dist
-
-      - uses: actions/download-artifact@v4
-        with:
           name: esp-web-tools
           path: esp-web-tools
 
-      - name: Build site
+      - name: Fetch release images
         env:
-          VERSION: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          tar -xzf "dist/t-sdr-c5-$VERSION.tar.gz" -C dist
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="$REF_NAME"; else version=$(gh release view --json tagName --jq .tagName); fi
+          gh release download "$version" --pattern "t-sdr-c5-$version.tar.gz" --dir dist
+          tar -xzf "dist/t-sdr-c5-$version.tar.gz" -C dist
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Build site
+        run: |
           mkdir -p site/firmware
           cp dist/t-sdr-c5-$VERSION/*.bin site/firmware/
           python3 -I tools/web_manifest.py "dist/t-sdr-c5-$VERSION/offsets.json" --version "$VERSION" > site/manifest.json

@@ -12,10 +12,10 @@ namespace settings
     {
         constexpr const char *nvs_namespace = "t-sdr-c5";
         constexpr const char *nvs_key = "state";
-        constexpr uint8_t layout_version = 2;
+        constexpr uint8_t layout_version = 3;
 
-        // Stable on-flash layout, independent of core::state. Version 1 had
-        // no gain byte; newer fields are only ever appended.
+        // Stable on-flash layout, independent of core::state. Fields are only
+        // ever appended: version 1 ended before `gain`, version 2 before `view`.
         struct stored
         {
             uint8_t version;
@@ -26,9 +26,13 @@ namespace settings
             uint8_t colormap;
             uint8_t brightness;
             uint8_t gain;
+            uint8_t view;
         };
 
-        constexpr size_t v1_size = offsetof(stored, gain);
+        constexpr size_t size_of_version(uint8_t version)
+        {
+            return version == 1 ? offsetof(stored, gain) : version == 2 ? offsetof(stored, view) : sizeof(stored);
+        }
     }
 
     core::state load()
@@ -41,8 +45,8 @@ namespace settings
 
         stored s{};
         size_t size = sizeof(s);
-        const bool ok = nvs_get_blob(handle, nvs_key, &s, &size) == ESP_OK &&
-                        ((s.version == layout_version && size == sizeof(s)) || (s.version == 1 && size == v1_size));
+        const bool ok = nvs_get_blob(handle, nvs_key, &s, &size) == ESP_OK && s.version >= 1 &&
+                        s.version <= layout_version && size == size_of_version(s.version);
 
         nvs_close(handle);
 
@@ -65,6 +69,9 @@ namespace settings
         if (s.version >= 2)
             state.gain = s.gain;
 
+        if (s.version >= 3)
+            state.view = s.view ? core::view_id::band : core::view_id::channel;
+
         return state;
     }
 
@@ -79,6 +86,7 @@ namespace settings
             .colormap = static_cast<uint8_t>(state.colormap),
             .brightness = state.brightness,
             .gain = state.gain,
+            .view = static_cast<uint8_t>(state.view),
         };
         nvs_handle_t handle;
 

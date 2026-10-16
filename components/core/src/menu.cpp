@@ -24,6 +24,8 @@ namespace core
     {
         switch (item)
         {
+        case menu_item::view:
+            return "View";
         case menu_item::span:
             return "Span";
         case menu_item::detector:
@@ -45,7 +47,15 @@ namespace core
     {
         switch (item)
         {
+        case menu_item::view:
+            s.view = s.view == view_id::channel ? view_id::band : view_id::channel;
+            return true;
+
         case menu_item::span:
+            // The band view always shows the whole band.
+            if (s.view == view_id::band)
+                return false;
+
             s.span_mhz = next_in(spans_mhz, s.span_mhz);
             return true;
 
@@ -84,8 +94,15 @@ namespace core
     {
         switch (item)
         {
+        case menu_item::view:
+            std::snprintf(out, size, "%s", s.view == view_id::channel ? "Channel" : "Band");
+            break;
+
         case menu_item::span:
-            std::snprintf(out, size, "%u MHz", s.span_mhz);
+            if (s.view == view_id::band)
+                std::snprintf(out, size, "Whole band");
+            else
+                std::snprintf(out, size, "%u MHz", s.span_mhz);
             break;
 
         case menu_item::detector:

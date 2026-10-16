@@ -11,6 +11,7 @@
 #include "core/colormap.hpp"
 #include "core/font5x7.hpp"
 #include "core/menu.hpp"
+#include "core/survey.hpp"
 
 namespace ui
 {
@@ -31,7 +32,7 @@ namespace ui
         constexpr uint16_t channel_bar = core::rgb565(0, 160, 200);
         constexpr uint16_t menu_bg = core::rgb565(10, 14, 24);
         constexpr uint16_t menu_selected = core::rgb565(0, 70, 120);
-        constexpr int menu_row_h = 16;
+        constexpr int menu_row_h = 22;
 
         // Draws row `gy` (0 = top) of `text` at scale `scale` into a pixel row.
         void text_row(uint16_t *row, int gy, int x, const char *text, int scale, uint16_t colour)
@@ -139,21 +140,35 @@ namespace ui
         }
 
         const auto &channel = f.state.current_channel();
+        const bool band_view = f.state.view == core::view_id::band;
+        // What each pixel means. In the band view the cursor moves without
+        // changing it, so the waterfall survives cursor moves.
+        const uint32_t mapping = band_view ? 0x80000000u | static_cast<uint32_t>(f.state.band)
+                                           : (static_cast<uint32_t>(channel.mhz) << 8) | f.state.span_mhz;
 
-        if (static_cast<unsigned>(channel.mhz) != m_axis_mhz || static_cast<unsigned>(f.state.span_mhz) != m_axis_span)
+        if (mapping != m_mapping)
         {
-            m_axis_mhz = channel.mhz;
-            m_axis_span = f.state.span_mhz;
+            m_mapping = mapping;
             m_hold.fill(0);
             m_floor.reset();
             std::memset(m_waterfall, 0, waterfall_h * width);
-            build_axis();
+            m_axis_cursor = 0; // force an axis rebuild
+        }
+
+        if (channel.mhz != m_axis_cursor)
+        {
+            m_axis_cursor = channel.mhz;
+            build_axis(f.state);
         }
 
         std::snprintf(m_status_left, sizeof(m_status_left), "%s CH%u %u", core::band_name(f.state.band), channel.number,
                       channel.mhz);
-        std::snprintf(m_status_right[0], sizeof(m_status_right[0]), "%uMHz %s", f.state.span_mhz,
-                      f.state.frozen ? "FROZEN" : f.state.detector == core::detector::peak ? "PEAK" : "MEAN");
+        const char *mode = f.state.frozen ? "FROZEN" : f.state.detector == core::detector::peak ? "PEAK" : "MEAN";
+
+        if (band_view)
+            std::snprintf(m_status_right[0], sizeof(m_status_right[0]), "BAND %s", mode);
+        else
+            std::snprintf(m_status_right[0], sizeof(m_status_right[0]), "%uMHz %s", f.state.span_mhz, mode);
         const char gain_mode = f.state.gain == core::gain_auto ? 'A' : f.state.gain == core::gain_agc ? 'H' : 'G';
         char battery[8] = "";
 
@@ -201,17 +216,17 @@ namespace ui
     {
         if (y < spectrum_y)
             status_row(y, row);
+        else if (m_last.state.menu_open)
+            menu_row(y - spectrum_y, row);
         else if (y < axis_y)
             spectrum_row(y - spectrum_y, row);
         else if (y < waterfall_y)
             std::memcpy(row, m_axis + (y - axis_y) * width, width * 2);
-        else if (m_last.state.menu_open)
-            menu_row(y - waterfall_y, row);
         else
             waterfall_row(y - waterfall_y, row);
     }
 
-    // Menu over the waterfall: one item per 16-pixel row, value right-aligned.
+    // Menu over the spectrum and waterfall: one item per row, value right-aligned.
     void renderer::menu_row(int y, uint16_t *row) const
     {
         const int index = y / menu_row_h;
@@ -226,11 +241,11 @@ namespace ui
         char value[24];
 
         core::menu_value(m_last.state, item, value, sizeof(value), m_last.version);
-        text_row(row, y % menu_row_h - 1, 6, core::menu_label(item), 2, selected ? white : grey);
+        text_row(row, y % menu_row_h - 4, 6, core::menu_label(item), 2, selected ? white : grey);
         // Long values (the version string) drop to the small font.
         const int scale = text_width(value, 2) > width - 96 ? 1 : 2;
 
-        text_row(row, y % menu_row_h - (scale == 2 ? 1 : 4), width - 6 - text_width(value, scale), value, scale, white);
+        text_row(row, y % menu_row_h - (scale == 2 ? 4 : 7), width - 6 - text_width(value, scale), value, scale, white);
     }
 
     void renderer::status_row(int y, uint16_t *row) const
@@ -258,7 +273,7 @@ namespace ui
         {
             const int mean = m_mean_h[x];
             const int peak = m_hold_h[x];
-            uint16_t c = x == width / 2 ? centre : bg;
+            uint16_t c = x == m_marker_x ? centre : bg;
 
             if (h < mean)
                 c = h == mean - 1 ? trace : fill;
@@ -279,13 +294,25 @@ namespace ui
             row[x] = lut[line[x]];
     }
 
-    void renderer::build_axis()
+    void renderer::build_axis(const core::state &state)
     {
-        const int span = static_cast<int>(m_axis_span);
-        const int centre_mhz = static_cast<int>(m_axis_mhz);
+        const auto &channel = state.current_channel();
+
+        if (state.view == core::view_id::band)
+            build_band_axis(state.band, channel.mhz);
+        else
+            build_channel_axis(channel.mhz, state.span_mhz);
+    }
+
+    void renderer::build_channel_axis(unsigned centre, unsigned span_mhz)
+    {
+        const int span = static_cast<int>(span_mhz);
+        const int centre_mhz = static_cast<int>(centre);
         const int label_step = span <= 20 ? 5 : span <= 40 ? 10 : 20;
         const auto x_of = [&](int mhz) { return width / 2 + (mhz - centre_mhz) * width / span; };
         char label[12];
+
+        m_marker_x = width / 2;
 
         for (int r = 0; r < axis_h; r++)
         {
@@ -312,6 +339,76 @@ namespace ui
                 const int lx = std::clamp(x - text_width(label, 1) / 2, 0, width - text_width(label, 1));
 
                 text_row(row, r - 4, lx, label, 1, grey);
+            }
+        }
+    }
+
+    // Channel numbers across the whole band, the cursor channel highlighted.
+    // 5 GHz channels sit 9 px apart, so labels skip channels that would overlap.
+    void renderer::build_band_axis(core::band band, unsigned cursor_mhz)
+    {
+        struct label
+        {
+            int x, w;
+            char text[8];
+            bool cursor;
+        };
+
+        const auto plan = core::make_survey_plan(band);
+        const int span = plan.high_mhz - plan.low_mhz;
+        const auto x_of = [&](int mhz) { return (mhz - plan.low_mhz) * width / span; };
+        const auto channels = core::channels(band);
+        std::array<label, core::channels_5.size()> labels{};
+        size_t count = 0;
+
+        for (const auto &c : channels)
+        {
+            label &l = labels[count++];
+
+            std::snprintf(l.text, sizeof(l.text), "%u", c.number);
+            l.w = text_width(l.text, 1);
+            l.x = std::clamp(x_of(c.mhz) - l.w / 2, 0, width - l.w);
+            l.cursor = c.mhz == cursor_mhz;
+        }
+
+        // Keep the cursor's label, then every other one that clears its neighbours.
+        const auto cursor = std::ranges::find_if(labels.begin(), labels.begin() + count, &label::cursor);
+        const auto overlaps = [](const label &a, const label &b) { return a.x < b.x + b.w + 3 && b.x < a.x + a.w + 3; };
+        std::array<bool, core::channels_5.size()> shown{};
+        const label *previous = nullptr;
+
+        for (size_t i = 0; i < count; i++)
+        {
+            const label &l = labels[i];
+
+            shown[i] = l.cursor || ((!previous || !overlaps(*previous, l)) &&
+                                    (cursor == labels.begin() + count || !overlaps(*cursor, l)));
+
+            if (shown[i])
+                previous = &l;
+        }
+
+        m_marker_x = x_of(static_cast<int>(cursor_mhz));
+
+        for (int r = 0; r < axis_h; r++)
+        {
+            uint16_t *row = m_axis + r * width;
+
+            std::fill(row, row + width, axis_bg);
+
+            if (r < 2)
+                std::fill(row + std::max(0, x_of(static_cast<int>(cursor_mhz) - 10)),
+                          row + std::min(width, x_of(static_cast<int>(cursor_mhz) + 10)), channel_bar);
+
+            for (size_t i = 0; i < count; i++)
+            {
+                const int x = x_of(channels[i].mhz);
+
+                if (r >= 2 && r < 4 && x >= 0 && x < width)
+                    row[x] = labels[i].cursor ? white : grey;
+
+                if (shown[i])
+                    text_row(row, r - 4, labels[i].x, labels[i].text, 1, labels[i].cursor ? white : grey);
             }
         }
     }

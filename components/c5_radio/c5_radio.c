@@ -146,6 +146,32 @@ esp_err_t c5_radio_tune(unsigned mhz) {
     return ESP_OK;
 }
 
+/* Survey steps: program the channel but keep the current DC calibration.
+ * The display removes DC per capture anyway; the PHY's own staleness signal
+ * still triggers a (rate-limited) recalibration in prepare_rx(). */
+esp_err_t c5_radio_tune_fast(unsigned mhz) {
+    if (!frequency_valid(mhz)) return ESP_ERR_INVALID_ARG;
+    static bool on_5ghz_channel;
+    frequency_mhz = mhz;
+    if (mhz > 3000) {
+        /* The Wi-Fi channel only selects the 5 GHz path; set it once. */
+        if (!on_5ghz_channel) (void)esp_wifi_set_channel(140, WIFI_SECOND_CHAN_NONE);
+        on_5ghz_channel = true;
+        phy_change_channel((int)mhz, 1, 0, 0);
+    } else {
+        on_5ghz_channel = false;
+        c5_set_chan(mhz, channel_mode);
+    }
+    phy_stop_tx_tone(1);
+    phy_pbus_workmode();
+    phy_pbus_xpd_tx_off();
+    phy_pbus_xpd_rx_on(1);
+    phy_set_rxclk_en(1);
+    gain_apply();
+    rx_ready = true;
+    return ESP_OK;
+}
+
 unsigned c5_radio_frequency(void) { return frequency_mhz; }
 
 void c5_radio_gain_hardware(void) {
