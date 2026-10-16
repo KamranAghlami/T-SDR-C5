@@ -23,3 +23,6 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
 - This machine has one core: build firmware in GitHub Actions, not locally.
   Host tests are cheap: `cmake -S tests/host -B <dir> && cmake --build <dir> && <dir>/core_tests`.
 - Never transmit. Python only in a venv; never touch the system Python.
+- Releases: tag `vX.Y.Z` on a commit **without** `[skip ci]` in its message —
+  GitHub skips the tag push's workflow too. If it happens:
+  `gh workflow run ci.yml --ref vX.Y.Z` (the release job keys off refs/tags/v*).
