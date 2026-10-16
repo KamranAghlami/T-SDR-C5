@@ -3,10 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Native controls (select popup, checkboxes, scrollbars) follow the theme too. -->
+  <meta name="color-scheme" content="light dark">
   <title>T-SDR-C5 Flasher</title>
   <meta name="description" content="Install the t-sdr-c5 Wi-Fi waterfall firmware on a LilyGO T-Display-C5 from your browser.">
   <style>
     :root {
+      color-scheme: light dark;
       --bg: #f6f7f9; --card: #ffffff; --text: #16181d; --muted: #5b6270; --border: #dde1e7;
       --accent: #0a6fd6; --accent-text: #ffffff; --warn-bg: #fff5e0; --warn-text: #6b4a00;
       --field: #eef1f5; --ok: #1a7f37; --error: #c62828;
@@ -20,7 +23,9 @@
         --log-bg: #0a0c10;
       }
     }
+    :root[data-theme="light"] { color-scheme: light; }
     :root[data-theme="dark"] {
+      color-scheme: dark;
       --bg: #0f1115; --card: #171a21; --text: #e8eaee; --muted: #9aa3b2; --border: #2a2f3a;
       --accent: #4aa3ff; --accent-text: #08111f; --warn-bg: #2b2210; --warn-text: #f0cf86;
       --field: #222733; --ok: #56d364; --error: #ff7b72;
@@ -126,6 +131,7 @@
       <button class="secondary" id="console-clear">Clear</button>
       <label class="check" style="margin:0"><input type="checkbox" id="autoscroll" checked> Auto-scroll</label>
     </div>
+    <p class="status" id="console-status" role="status"></p>
     <pre id="console" aria-live="off"></pre>
   </section>
 
@@ -222,7 +228,8 @@
     try {
       port = await navigator.serial.requestPort();
     } catch {
-      return; // picker cancelled
+      setStatus('No port selected. Click Install and choose the board\'s port.', 'error');
+      return;
     }
 
     await closeConsole();
@@ -298,16 +305,29 @@
     }
   }
 
+  const consoleStatus = (text, kind = '') => {
+    $('console-status').textContent = text;
+    $('console-status').className = `status ${kind}`;
+  };
+
   async function openConsole() {
     let port;
     try {
       port = await navigator.serial.requestPort();
     } catch {
+      consoleStatus('No port selected. Click Connect and choose the board\'s port.', 'error');
       return;
     }
 
     consoleTransport = new Transport(port, false);
-    await consoleTransport.connect(115200);
+    try {
+      await consoleTransport.connect(115200);
+    } catch (error) {
+      consoleTransport = null;
+      consoleStatus(`Could not open the port: ${error?.message ?? error}`, 'error');
+      return;
+    }
+    consoleStatus('Connected at 115200 baud.', 'ok');
     reading = true;
     consoleToggle.textContent = 'Disconnect';
     consoleReset.disabled = false;
@@ -331,6 +351,7 @@
     if (pending) appendLine(pending);
     pending = '';
     appendLine('[disconnected]');
+    consoleStatus('');
     consoleToggle.textContent = 'Connect';
     consoleReset.disabled = true;
   }

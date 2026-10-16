@@ -346,52 +346,25 @@ namespace ui
         }
     }
 
-    // Channel numbers across the whole band, the cursor channel highlighted.
-    // 5 GHz channels sit 9 px apart, so labels skip channels that would overlap.
+    // The whole band: a tick per channel along the bottom, the cursor channel's
+    // number and its 20 MHz extent highlighted. Only the cursor is labelled:
+    // 5 GHz channels sit 9 px apart, too close for readable numbers.
     void renderer::build_band_axis(core::band band, unsigned cursor_mhz)
     {
-        struct label
-        {
-            int x, w;
-            char text[8];
-            bool cursor;
-        };
-
         const auto plan = core::make_survey_plan(band);
         const int span = plan.high_mhz - plan.low_mhz;
         const auto x_of = [&](int mhz) { return (mhz - plan.low_mhz) * width / span; };
-        const auto channels = core::channels(band);
-        std::array<label, core::channels_5.size()> labels{};
-        size_t count = 0;
+        const int cursor_x = x_of(static_cast<int>(cursor_mhz));
+        char label[8] = "";
 
-        for (const auto &c : channels)
-        {
-            label &l = labels[count++];
+        for (const auto &c : core::channels(band))
+            if (c.mhz == cursor_mhz)
+                std::snprintf(label, sizeof(label), "%u", c.number);
 
-            std::snprintf(l.text, sizeof(l.text), "%u", c.number);
-            l.w = text_width(l.text, 1);
-            l.x = std::clamp(x_of(c.mhz) - l.w / 2, 0, width - l.w);
-            l.cursor = c.mhz == cursor_mhz;
-        }
+        const int label_w = text_width(label, 1);
+        const int label_x = std::clamp(cursor_x - label_w / 2, 0, width - label_w);
 
-        // Keep the cursor's label, then every other one that clears its neighbours.
-        const auto cursor = std::ranges::find_if(labels.begin(), labels.begin() + count, &label::cursor);
-        const auto overlaps = [](const label &a, const label &b) { return a.x < b.x + b.w + 3 && b.x < a.x + a.w + 3; };
-        std::array<bool, core::channels_5.size()> shown{};
-        const label *previous = nullptr;
-
-        for (size_t i = 0; i < count; i++)
-        {
-            const label &l = labels[i];
-
-            shown[i] = l.cursor || ((!previous || !overlaps(*previous, l)) &&
-                                    (cursor == labels.begin() + count || !overlaps(*cursor, l)));
-
-            if (shown[i])
-                previous = &l;
-        }
-
-        m_marker_x = x_of(static_cast<int>(cursor_mhz));
+        m_marker_x = cursor_x;
 
         for (int r = 0; r < axis_h; r++)
         {
@@ -403,16 +376,16 @@ namespace ui
                 std::fill(row + std::max(0, x_of(static_cast<int>(cursor_mhz) - 10)),
                           row + std::min(width, x_of(static_cast<int>(cursor_mhz) + 10)), channel_bar);
 
-            for (size_t i = 0; i < count; i++)
-            {
-                const int x = x_of(channels[i].mhz);
+            if (r >= tick_row)
+                for (const auto &c : core::channels(band))
+                {
+                    const int x = x_of(c.mhz);
 
-                if (r >= tick_row && x >= 0 && x < width)
-                    row[x] = labels[i].cursor ? white : grey;
+                    if (x >= 0 && x < width)
+                        row[x] = c.mhz == cursor_mhz ? white : grey;
+                }
 
-                if (shown[i])
-                    text_row(row, r - label_row, labels[i].x, labels[i].text, 1, labels[i].cursor ? white : grey);
-            }
+            text_row(row, r - label_row, label_x, label, 1, white);
         }
     }
 }
