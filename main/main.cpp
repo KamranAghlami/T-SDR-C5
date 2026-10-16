@@ -218,11 +218,10 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(lcd.init());
     ESP_ERROR_CHECK(renderer.init(lcd));
 
-    const char *version = esp_app_get_description()->version;
-
-    renderer.splash(version);
-    lcd.set_backlight(80);
-    ESP_LOGI(tag, "t-sdr-c5 %s", version);
+    renderer.clear();
+    ESP_LOGI(tag, "t-sdr-c5 %s", esp_app_get_description()->version);
+    // The vendor capture routine logs every snapshot; that also slows it down.
+    esp_log_level_set("phy", ESP_LOG_WARN);
 
     gestures = xQueueCreate(8, sizeof(core::gesture));
     frames = xQueueCreate(2, sizeof(ui::frame));

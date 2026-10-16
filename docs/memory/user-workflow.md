@@ -13,3 +13,6 @@ releases on tags.
 
 **How to apply:** make every hardware-facing change easy to verify from a photo
 (on-screen diagnostics), give exact flash steps, and push small testable steps.
+
+User preferences seen so far: no splash screen (it flashed by and served no
+purpose); prefers keeping the device UI minimal and to the point.

@@ -17,6 +17,10 @@ Verified on hardware (spike photo, 2026-10-16):
   read "DOWN" for that reason. We do not link burst_gpio.
 - Rows written must cover all 170 lines, otherwise stale panel RAM shows as noise.
 
+Verified with M1 firmware (2026-10-16): colours, spectrum orientation (Q negated,
+see core::prepare_iq), 25-26 lines/s, NVS restore all correct. Vendor adctrig()
+logs `I phy: 0x3ff,0x40000,...` on every capture; silence the "phy" tag. M1 got
+11 captures/line with that logging on.
+
 **Why:** these cost a hardware round-trip to learn. **How to apply:** keep them
-when touching board/ code; still to confirm: spectrum orientation (Q negated),
-button pull-ups, 5 GHz reception. See [[sram-budget]].
+when touching board/ code; still to confirm: 5 GHz reception. See [[sram-budget]].

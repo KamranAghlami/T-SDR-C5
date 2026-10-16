@@ -141,8 +141,10 @@ colour map, brightness, view (channel/band survey), about (version).
 ### 3.5 Persistence and boot
 
 Band, channel per band, span, detector, gain, colour map and brightness are
-stored in NVS (written after 2 s without changes, to limit flash wear). Boot sequence: splash
-with version, about 1 s; then the last channel. A cold boot to the first waterfall takes under 2 s.
+stored in NVS (written after 2 s without changes, to limit flash wear). Boot: the panel is
+cleared while the radio initialises (backlight off), then the last channel shows. No splash
+screen (dropped after the first hardware test); the version is in the boot log and the
+menu's About item. A cold boot to the first waterfall takes under 2 s.
 
 ### 3.6 Gain
 
@@ -229,7 +231,7 @@ t-sdr-c5/
 * **release.yml** (tag `v*`): same build, then a GitHub Release with
   `t-sdr-c5-<ver>-merged.bin` (flash at `0x0`), bootloader/partition/app bins,
   `flash_args`, `offsets.json`, `SHA256SUMS`, auto-generated notes. Uses `GITHUB_TOKEN`.
-* Version = `git describe`, shown on the splash/about screen.
+* Version = `git describe`, shown in the boot log and the menu About item.
 
 ## 8. README outline
 

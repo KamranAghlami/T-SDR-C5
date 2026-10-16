@@ -100,26 +100,9 @@ namespace ui
         }
     }
 
-    void renderer::splash(const char *version)
+    void renderer::clear()
     {
-        struct
-        {
-            const char *text;
-            int y, scale;
-            uint16_t colour;
-        } const lines[] = {
-            {"T-SDR-C5", 40, 4, white},
-            {"ESP32-C5 Wi-Fi waterfall", 84, 2, grey},
-            {version, 120, 1, grey},
-            {"receive-only - powered by ESP-SDR", 150, 1, grey},
-        };
-
-        flush([&](int y, uint16_t *row) {
-            std::fill(row, row + width, black);
-
-            for (const auto &line : lines)
-                text_row(row, y - line.y, (width - text_width(line.text, line.scale)) / 2, line.text, line.scale, line.colour);
-        });
+        flush([](int, uint16_t *row) { std::fill(row, row + width, black); });
     }
 
     int renderer::level(uint8_t code, int scale) const

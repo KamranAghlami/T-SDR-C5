@@ -33,7 +33,8 @@ namespace ui
     public:
         esp_err_t init(board::lcd &lcd);
 
-        void splash(const char *version);
+        // Blanks the panel (its RAM holds noise after power-up).
+        void clear();
 
         void show(const frame &f);
 
