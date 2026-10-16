@@ -29,3 +29,7 @@ SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
 - Browser flasher: `web/index.html` + `tools/web_manifest.py`, deployed to
   GitHub Pages by the `pages` job on `v*` tags (environment `github-pages`
   allows `v*` tags). It flashes the separate images so NVS survives updates.
+- The flasher's ESP Web Tools is built from a pinned upstream commit (ci.yml
+  `web` job) because 10.4.0 bundles esptool-js 0.6.x, which can't detect
+  ESP32-C5 rev 1.2 ("Failed to initialize"). Once a release > 10.4.0 ships
+  esptool-js >= 0.7.0, drop the job and load it from unpkg again.
