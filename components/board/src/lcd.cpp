@@ -76,13 +76,13 @@ namespace board
         ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(m_panel, true), "lcd", "invert");
         ESP_RETURN_ON_ERROR(esp_lcd_panel_set_gap(m_panel, 0, 35), "lcd", "gap");
 
-        const ledc_timer_config_t timer = {
-            .speed_mode = LEDC_LOW_SPEED_MODE,
-            .duty_resolution = LEDC_TIMER_8_BIT,
-            .timer_num = backlight_timer,
-            .freq_hz = 5000,
-            .clk_cfg = LEDC_AUTO_CLK,
-        };
+        ledc_timer_config_t timer = {};
+
+        timer.speed_mode = LEDC_LOW_SPEED_MODE;
+        timer.duty_resolution = LEDC_TIMER_8_BIT;
+        timer.timer_num = backlight_timer;
+        timer.freq_hz = 5000;
+        timer.clk_cfg = LEDC_AUTO_CLK;
 
         ESP_RETURN_ON_ERROR(ledc_timer_config(&timer), "lcd", "backlight timer");
 

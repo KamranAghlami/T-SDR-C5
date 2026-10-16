@@ -152,7 +152,7 @@ namespace ui
 
         const auto &channel = f.state.current_channel();
 
-        if (channel.mhz != m_axis_mhz || f.state.span_mhz != m_axis_span)
+        if (static_cast<unsigned>(channel.mhz) != m_axis_mhz || static_cast<unsigned>(f.state.span_mhz) != m_axis_span)
         {
             m_axis_mhz = channel.mhz;
             m_axis_span = f.state.span_mhz;
@@ -236,7 +236,7 @@ namespace ui
         const int centre_mhz = static_cast<int>(m_axis_mhz);
         const int label_step = span <= 20 ? 5 : span <= 40 ? 10 : 20;
         const auto x_of = [&](int mhz) { return width / 2 + (mhz - centre_mhz) * width / span; };
-        char label[8];
+        char label[12];
 
         for (int r = 0; r < axis_h; r++)
         {

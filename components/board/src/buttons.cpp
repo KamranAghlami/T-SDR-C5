@@ -12,23 +12,21 @@ namespace board
     {
         m_gestures = gestures;
 
-        const gpio_config_t config = {
-            .pin_bit_mask = (1ull << pins::button_a) | (1ull << pins::button_b),
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_ENABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_DISABLE,
-        };
+        gpio_config_t config = {};
+
+        config.pin_bit_mask = (1ull << pins::button_a) | (1ull << pins::button_b);
+        config.mode = GPIO_MODE_INPUT;
+        config.pull_up_en = GPIO_PULLUP_ENABLE;
 
         ESP_RETURN_ON_ERROR(gpio_config(&config), "buttons", "gpio");
 
-        const esp_timer_create_args_t timer = {
-            .callback = on_tick,
-            .arg = this,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name = "buttons",
-            .skip_unhandled_events = true,
-        };
+        esp_timer_create_args_t timer = {};
+
+        timer.callback = on_tick;
+        timer.arg = this;
+        timer.dispatch_method = ESP_TIMER_TASK;
+        timer.name = "buttons";
+        timer.skip_unhandled_events = true;
 
         ESP_RETURN_ON_ERROR(esp_timer_create(&timer, &m_timer), "buttons", "timer");
 
