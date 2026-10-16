@@ -1,0 +1,16 @@
+t-sdr-c5
+========
+
+Copyright (C) 2026 t-sdr-c5 contributors. Licensed under the GNU General Public
+License version 3 or (at your option) any later version; see LICENSE.
+
+Third-party code
+----------------
+
+* ESP-SDR (https://github.com/ESPARGOS/esp-sdr), GPL-3.0-or-later, Copyright
+  ESP-SDR contributors / ESPARGOS. Included as the third_party/esp-sdr
+  submodule. components/c5_radio compiles its receive calibration sources and
+  adapts its ESP32-C5 receiver setup and capture code.
+* Turbo colormap polynomial approximation, Copyright 2019 Google LLC,
+  Apache-2.0 (components/core/include/core/colormap.hpp).
+* ESP-IDF, Apache-2.0, Copyright Espressif Systems.

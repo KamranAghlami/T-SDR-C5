@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run
+        run: |
+          cmake -S tests/host -B build-host -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build-host -j
+          ctest --test-dir build-host --output-on-failure
+
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true # esp-sdr only; its esp-dsp submodule is not used
+          fetch-depth: 0 # git describe for the firmware version
+
+      - name: Read pinned ESP-IDF commit
+        id: idf
+        run: |
+          ref=$(tr -d '[:space:]' < idf-ref)
+          upstream=$(python3 -I -c 'import json,sys; print(next(p["idf_ref"] for p in json.load(open(sys.argv[1]))["profiles"] if p["id"]=="esp32c5"))' third_party/esp-sdr/firmware-targets.json)
+          if [ "$ref" != "$upstream" ]; then
+            echo "::error file=idf-ref::idf-ref ($ref) differs from the ESP-SDR C5 pin ($upstream). The receiver relies on private PHY ABI offsets of that exact SDK."
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Check out ESP-IDF
+        uses: actions/checkout@v4
+        with:
+          repository: espressif/esp-idf
+          ref: ${{ steps.idf.outputs.ref }}
+          path: .esp-idf
+          submodules: recursive
+
+      - name: Cache SDK tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.espressif
+          key: idf-${{ runner.os }}-${{ steps.idf.outputs.ref }}-esp32c5
+
+      - name: Install SDK tools
+        run: .esp-idf/install.sh esp32c5
+
+      - name: Build
+        run: |
+          source .esp-idf/export.sh
+          idf.py -B build build
+          idf.py -B build merge-bin -o "$PWD/build/merged.bin"
+
+      - name: Check SRAM headroom
+        run: |
+          source .esp-idf/export.sh
+          python3 -I tools/headroom.py build/t_sdr_c5.elf --min-kib 8 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Package
+        run: |
+          version=$(git describe --tags --always --dirty)
+          out="dist/t-sdr-c5-$version"
+          mkdir -p "$out"
+          cp build/merged.bin "dist/t-sdr-c5-$version-merged.bin"
+          cp build/bootloader/bootloader.bin build/partition_table/partition-table.bin build/t_sdr_c5.bin build/flash_args "$out/"
+          python3 -I tools/offsets.py build/flash_args > "$out/offsets.json"
+          (cd dist && tar -czf "t-sdr-c5-$version.tar.gz" "t-sdr-c5-$version" && rm -r "t-sdr-c5-$version")
+          (cd dist && sha256sum * > SHA256SUMS)
+          cp build/t_sdr_c5.elf build/t_sdr_c5.map dist/
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [host-tests, firmware]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*-merged.bin
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
