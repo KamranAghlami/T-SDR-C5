@@ -261,9 +261,11 @@ namespace
                 const uint32_t t1 = esp_cpu_get_cycle_count();
 
                 gain = static_cast<uint8_t>((words[0] >> 20) & 0x7f);
-                line_peak = std::max(line_peak, core::prepare_iq(words, core::fft_size, window.data(), samples));
-                fft.forward(samples);
-                accumulator.add(samples);
+                const auto block = core::prepare_iq(words, core::fft_size, window.data(), fft.order(), samples);
+
+                line_peak = std::max(line_peak, block.peak);
+                fft.forward_permuted(samples);
+                accumulator.add(samples, block.scale);
                 capture_cycles += t1 - t0;
                 dsp_cycles += esp_cpu_get_cycle_count() - t1;
                 timed++;
@@ -311,12 +313,13 @@ namespace
 
                 ESP_LOGI(tag,
                          "%u lines/s, %u captures/line (capture %u us, dsp %u us, ui %u us/frame), %u failures, "
-                         "%u recalibrations, gain %u, peak %u, SRAM %u",
+                         "%u recalibrations, gain %u, peak %u, SRAM %u, battery %u mV %d mA",
                          lines, f.captures, per_capture_us(capture_cycles), per_capture_us(dsp_cycles),
                          static_cast<unsigned>(renderer.render_us()),
                          static_cast<unsigned>(stats.failures - last_stats.failures),
                          static_cast<unsigned>(stats.recalibrations - last_stats.recalibrations), gain, second_peak,
-                         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+                         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), f.battery.millivolts,
+                         f.battery.milliamps);
                 capture_cycles = dsp_cycles = 0;
                 timed = 0;
                 last_stats = stats;

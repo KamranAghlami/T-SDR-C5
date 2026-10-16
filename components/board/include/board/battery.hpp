@@ -8,15 +8,26 @@
 
 namespace board
 {
-    struct battery_status
+    enum class power_source : uint8_t
     {
-        bool present = false; // gauge answered and a cell is connected
-        bool charging = false;
-        uint8_t percent = 0;
-        uint16_t millivolts = 0;
+        unknown,     // no gauge
+        external,    // no cell current: on USB with the cell full, or no cell at all
+        charging,
+        discharging, // running from the cell
     };
 
-    // AXP2602 fuel gauge on I2C (address 0x62).
+    struct battery_status
+    {
+        power_source source = power_source::unknown;
+        uint8_t percent = 0;
+        uint16_t millivolts = 0;
+        int16_t milliamps = 0; // positive while charging
+    };
+
+    // AXP2602 fuel gauge on I2C (address 0x62). It has no presence or charger
+    // status, and the TP4065 charger's CHRG pin only drives an LED, so the
+    // cell current decides: with USB connected and no cell, the charger holds
+    // the battery pin near 4.2 V, which is why the voltage can't tell.
     class battery
     {
     public:

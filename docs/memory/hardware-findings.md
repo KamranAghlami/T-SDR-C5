@@ -22,5 +22,11 @@ see core::prepare_iq), 25-26 lines/s, NVS restore all correct. Vendor adctrig()
 logs `I phy: 0x3ff,0x40000,...` on every capture; silence the "phy" tag. M1 got
 11 captures/line with that logging on.
 
+- Battery: AXP2602 is gauge-only (no presence/charger bit); TP4065 CHRG drives an
+  LED only. With USB and no cell the charger holds VBAT ~4.2 V, so voltage can't
+  detect a missing cell. Decide by cell current (|I| < 5 mA => external power).
+- M3 timing on HW: capture 70 us, DSP 1446 us (FFT dominated: saturation
+  branches), UI 3.5 ms/frame; 25 captures/line.
+
 **Why:** these cost a hardware round-trip to learn. **How to apply:** keep them
 when touching board/ code; still to confirm: 5 GHz reception. See [[sram-budget]].

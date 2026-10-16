@@ -14,8 +14,9 @@ namespace board
         constexpr uint8_t reg_id = 0x00, reg_mode = 0x02, reg_vbat = 0x04, reg_soc = 0x08, reg_ibat = 0x14;
         constexpr uint8_t chip_id = 0x1c;
         constexpr int timeout_ms = 20;
-        // Without a cell the gauge reads close to 0 V.
-        constexpr uint16_t min_cell_mv = 2500;
+        // The board alone draws far more than this from a cell, so a smaller
+        // current means external power.
+        constexpr int idle_ma = 5;
     }
 
     esp_err_t battery::init()
@@ -73,11 +74,17 @@ namespace board
             read_registers(reg_ibat, ibat, 2) != ESP_OK)
             return status;
 
-        status.millivolts = static_cast<uint16_t>(((vbat[0] << 8) | vbat[1]) & 0x3fff);
-        status.present = status.millivolts >= min_cell_mv;
-        status.percent = soc > 100 ? 100 : soc;
         // Signed, big-endian; positive while charging.
-        status.charging = static_cast<int16_t>((ibat[0] << 8) | ibat[1]) > 0;
+        const int raw_current = static_cast<int16_t>((ibat[0] << 8) | ibat[1]);
+        // 2.5 uV per LSB across the 10 mOhm sense resistor (R33): 0.25 mA.
+        const int milliamps = raw_current / 4;
+
+        status.millivolts = static_cast<uint16_t>(((vbat[0] << 8) | vbat[1]) & 0x3fff);
+        status.percent = soc > 100 ? 100 : soc;
+        status.milliamps = static_cast<int16_t>(milliamps);
+        status.source = milliamps > idle_ma     ? power_source::charging
+                        : milliamps < -idle_ma ? power_source::discharging
+                                               : power_source::external;
 
         return status;
     }

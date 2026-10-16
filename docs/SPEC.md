@@ -77,7 +77,7 @@ CI fails if headroom drops below 8 KiB.
 | AXP2602 INT | 10 | optional |
 | UART0 TX / RX | 11 / 12 | left free (the ESP-SDR UART bridge is disabled) |
 | Flash / PSRAM | — | 16 MB / 8 MB quad PSRAM |
-| USB | native USB-Serial/JTAG | flashing, logs, (later) host mode |
+| USB | native USB-Serial/JTAG | flashing, logs |
 
 ## 3. Functional specification
 
@@ -250,7 +250,7 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | M1 | Repo skeleton, CI, release pipeline, board bring-up, radio capture → one spectrum line — **done** | — |
 | M2 | Channel view MVP: waterfall, spectrum, status, channel/band buttons, NVS — **done, verified on HW** | `v0.1.0` ✅ |
 | M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % — **on `main`, awaiting HW test** | `v0.2.0` |
-| M4 | Stretch: band survey, USB host mode (ESPARGOS viewer compatible), web flasher | `v0.3.0` |
+| M4 | Stretch: band survey, web flasher | `v0.3.0` |
 
 ## 10. Testing
 
@@ -276,6 +276,6 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 |---|---|---|
 | D1 | Radio code base | **Upstream ESP-SDR as a pinned submodule + ported ESPsoup fast capture engine and `TUNEM`** (attributed, GPL-3.0) |
 | D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press) |
-| D3 | USB host mode (ESPARGOS viewer compatible) | **Later, in M4** |
+| D3 | USB host mode (ESPARGOS viewer compatible) | **Dropped** (2026-10-16): anyone who wants a USB SDR can flash ESP-SDR itself |
 | D4 | Language | **C++23 app/UI/DSP, C radio layer** |
 | D5 | Default view | Channel view, 80 MS/s capture, 40 MHz displayed span, peak detector |

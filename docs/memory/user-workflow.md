@@ -16,3 +16,6 @@ releases on tags.
 
 User preferences seen so far: no splash screen (it flashed by and served no
 purpose); prefers keeping the device UI minimal and to the point.
+
+Scope decisions: USB host mode (ESPARGOS viewer compatibility) dropped on
+2026-10-16 — "people can use their firmware if they want to".

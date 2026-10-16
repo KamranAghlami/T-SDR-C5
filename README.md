@@ -30,6 +30,9 @@ no SDR dongle and no extra hardware: just the board and its antenna.
   chip's hardware AGC does on every packet. Hardware AGC or a manual gain are also available.
 - Settings menu (span, detector, gain, colours, brightness, version), battery percentage.
 - Remembers band, channel per band and all settings across power cycles.
+
+Want the board as a USB SDR for a PC instead? Flash [ESP-SDR](https://github.com/ESPARGOS/esp-sdr)
+itself and use its browser viewer. t-sdr-c5 is the standalone counterpart.
 - **Receive-only.** The firmware never transmits on purpose (see [Limitations](#limitations)).
 
 ## Hardware
@@ -87,7 +90,7 @@ In the menu, **A** moves to the next item, **B** changes its value, and a long p
 ```
 ┌──────────────────────────────────────────────┐
 │ 2.4G CH6 2437                  40MHz PEAK    │  band, channel, centre MHz | span, detector
-│                            25/s A42 87%      │  lines/s, gain (A=auto H=HW AGC G=manual), battery
+│                            25/s A42 87%      │  lines/s, gain (A=auto H=HW AGC G=manual), power
 ├──────────────────────────────────────────────┤
 │  live spectrum: mean (cyan) + peak hold      │  10 dB grid lines
 ├──────────────────────────────────────────────┤
@@ -96,6 +99,10 @@ In the menu, **A** moves to the next item, **B** changes its value, and a long p
 │  waterfall, newest line at the top           │  ≈4 s of history
 └──────────────────────────────────────────────┘
 ```
+
+Power shows `87%` on battery, `87%+` while charging, and `USB` on external power with the
+cell full or absent. The gauge can't tell those two apart: with USB connected and no cell, the
+charger holds the battery pin at full voltage.
 
 Colours in the waterfall are relative to the tracked noise floor: dark blue is
 the floor, red is about 40 dB above it. The status bar turns orange while the

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Host tests for components/core (no ESP-IDF).
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <cstdio>
@@ -104,13 +105,122 @@ namespace
 
         for (unsigned j = 0; j < n; j++)
         {
-            x[2 * j] = 32767;
-            x[2 * j + 1] = -32767;
+            x[2 * j] = core::fft_q15::max_input;
+            x[2 * j + 1] = -core::fft_q15::max_input;
         }
 
         fft.forward(x.data());
-        CHECK(x[0] > 32000 && x[1] < -32000);
+        CHECK(x[0] > 16000 && x[1] < -16000);
         CHECK(argmax_power(x.data(), n) == 0);
+    }
+
+    // Thermal noise of a few LSB must not drown in fixed-point rounding: the
+    // mean power over all bins has to match a double-precision reference.
+    void test_noise_floor_precision()
+    {
+        const unsigned n = core::fft_size;
+        const core::fft_q15 fft(core::fft_log2);
+        const auto window = core::hann_q15(n);
+        std::vector<uint32_t> words(n);
+        std::vector<int16_t> samples(2 * n);
+        std::vector<std::complex<double>> reference(n);
+        uint32_t seed = 12345;
+        const auto gaussian = [&] {
+            // Sum of 12 uniforms minus 6: close enough to N(0, 1).
+            double sum = 0;
+
+            for (int i = 0; i < 12; i++)
+            {
+                seed = seed * 1664525u + 1013904223u;
+                sum += (seed >> 8) / 16777216.0;
+            }
+
+            return sum - 6.0;
+        };
+
+        for (const double sigma : {0.5, 1.0, 2.0, 4.0, 50.0})
+        {
+            double fixed = 0, exact = 0;
+
+            for (int trial = 0; trial < 8; trial++)
+            {
+                std::vector<std::complex<double>> v(n);
+                std::complex<double> mean;
+
+                for (unsigned j = 0; j < n; j++)
+                {
+                    const auto lo = static_cast<int32_t>(std::lround(sigma * gaussian()));
+                    const auto hi = static_cast<int32_t>(std::lround(sigma * gaussian()));
+
+                    words[j] = (static_cast<uint32_t>(lo) & 0x3ffu) | ((static_cast<uint32_t>(hi) & 0x3ffu) << 10);
+                    v[j] = {double(lo), -double(hi)};
+                    mean += v[j];
+                }
+
+                mean /= n;
+
+                const auto block = core::prepare_iq(words.data(), n, window.data(), fft.order(), samples.data());
+                const double unscale = std::pow(4.0, -double(block.scale));
+
+                fft.forward_permuted(samples.data());
+
+                for (unsigned k = 0; k < n; k += 7) // a subset of bins keeps the DFT cheap
+                {
+                    std::complex<double> sum;
+
+                    for (unsigned j = 0; j < n; j++)
+                        sum += (v[j] - mean) * (window[j] / 32768.0) * std::polar(1.0, -2 * pi * k * j / n);
+
+                    sum /= n;
+                    exact += std::norm(sum);
+                    fixed += (double(samples[2 * k]) * samples[2 * k] + double(samples[2 * k + 1]) * samples[2 * k + 1]) *
+                             unscale;
+                }
+            }
+
+            const double error_db = 10 * std::log10(fixed / exact);
+
+            std::printf("noise floor at %.1f LSB rms: fixed-point %+.2f dB vs exact\n", sigma, error_db);
+            CHECK(std::abs(error_db) < 0.2);
+        }
+    }
+
+    // A capture scaled by 2^scale must land on the same normalized power as
+    // the same signal at a different amplitude: codes differ by exactly the
+    // amplitude ratio (12 codes = 6 dB for 2x).
+    void test_block_scale_normalization()
+    {
+        const unsigned n = core::fft_size;
+        const core::fft_q15 fft(core::fft_log2);
+        const auto window = core::hann_q15(n);
+        std::vector<uint32_t> words(n);
+        std::vector<int16_t> samples(2 * n);
+        uint8_t codes[2];
+        unsigned scales[2];
+
+        for (int i = 0; i < 2; i++)
+        {
+            const double amplitude = i ? 200.0 : 100.0;
+
+            for (unsigned j = 0; j < n; j++)
+                words[j] = dump_word(2 * pi * 5e6 * j / core::sample_rate_hz, amplitude);
+
+            const auto block = core::prepare_iq(words.data(), n, window.data(), fft.order(), samples.data());
+            core::line_accumulator line;
+            std::vector<uint8_t> peak(320), mean(320);
+
+            fft.forward_permuted(samples.data());
+            line.configure(n, core::span_bins(40));
+            line.add(samples.data(), block.scale);
+            line.finish(peak.data(), mean.data(), 320);
+            codes[i] = *std::max_element(peak.begin(), peak.end());
+            scales[i] = block.scale;
+        }
+
+        std::printf("block scale: codes %u (scale %u) and %u (scale %u)\n", codes[0], scales[0], codes[1], scales[1]);
+        CHECK(scales[0] == scales[1] + 1);
+        CHECK(codes[1] >= codes[0] + 11 && codes[1] <= codes[0] + 13);
+        CHECK(codes[1] < 255);
     }
 
     void test_power_code()
@@ -155,8 +265,10 @@ namespace
             words[j] = low | (high << 10) | (55u << 20);
         }
 
-        core::prepare_iq(words.data(), n, window.data(), samples.data());
-        fft.forward(samples.data());
+        const auto block = core::prepare_iq(words.data(), n, window.data(), fft.order(), samples.data());
+
+        CHECK(block.peak >= 299 && block.peak <= 341); // 300 plus the injected offset
+        fft.forward_permuted(samples.data());
 
         const unsigned bin = argmax_power(samples.data(), n);
 
@@ -167,8 +279,8 @@ namespace
 
         line.configure(n, core::span_bins(40));
         CHECK(core::span_bins(40) == 512);
-        line.add(samples.data());
-        line.add(samples.data());
+        line.add(samples.data(), block.scale);
+        line.add(samples.data(), block.scale);
         CHECK(line.count() == 2);
         line.finish(peak.data(), mean.data(), 320);
         CHECK(line.count() == 0);
@@ -355,6 +467,8 @@ int main()
 {
     test_fft_matches_dft();
     test_fft_full_scale_does_not_wrap();
+    test_noise_floor_precision();
+    test_block_scale_normalization();
     test_power_code();
     test_orientation_and_line();
     test_floor_tracker();

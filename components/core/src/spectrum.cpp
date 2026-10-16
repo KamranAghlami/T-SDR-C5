@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <numbers>
 
 namespace core
@@ -25,7 +26,9 @@ namespace core
             return table;
         }
 
-        inline int16_t sat(int32_t v) { return static_cast<int16_t>(v > 32767 ? 32767 : v < -32767 ? -32767 : v); }
+        // Normalized powers span about 2^12 (0.5 LSB rms noise) to 2^42 (a
+        // full-scale tone); this bias keeps their codes within 0..255.
+        constexpr unsigned code_bias_log2 = 12;
 
         inline int32_t field(uint32_t word, unsigned shift)
         {
@@ -33,7 +36,7 @@ namespace core
         }
     }
 
-    uint8_t power_code(uint64_t power)
+    uint8_t power_code(uint64_t power, unsigned bias_log2)
     {
         if (!power)
             return 0;
@@ -42,8 +45,12 @@ namespace core
         const unsigned fraction = exponent >= 8 ? static_cast<unsigned>(power >> (exponent - 8)) & 255u
                                                 : static_cast<unsigned>(power << (8 - exponent)) & 255u;
         const uint32_t log2_q8 = exponent * 256u + log2_fraction_q8()[fraction];
+
+        if (log2_q8 <= bias_log2 * 256u)
+            return 0;
+
         // 2 * 10*log10(2) * 2^16 / 256 = 1541.1
-        const uint32_t code = (log2_q8 * 1541u + 32768u) >> 16;
+        const uint32_t code = ((log2_q8 - bias_log2 * 256u) * 1541u + 32768u) >> 16;
 
         return static_cast<uint8_t>(std::min<uint32_t>(code, 255));
     }
@@ -58,7 +65,7 @@ namespace core
         return window;
     }
 
-    unsigned prepare_iq(const uint32_t *words, unsigned n, const int16_t *window, int16_t *out)
+    iq_block prepare_iq(const uint32_t *words, unsigned n, const int16_t *window, const uint16_t *order, int16_t *out)
     {
         int32_t sum_low = 0, sum_high = 0, peak = 0;
 
@@ -74,17 +81,26 @@ namespace core
         const int32_t half = static_cast<int32_t>(n / 2);
         const int32_t mean_low = (sum_low + (sum_low >= 0 ? half : -half)) / static_cast<int32_t>(n);
         const int32_t mean_high = (sum_high + (sum_high >= 0 ? half : -half)) / static_cast<int32_t>(n);
+        // Bound on |sample - mean|; the window is at most 1.
+        const int32_t bound = std::max<int32_t>(1, peak + std::max(std::abs(mean_low), std::abs(mean_high)));
+        unsigned scale = 0;
+
+        while (scale < max_scale && (bound << (scale + 1)) <= 16383)
+            scale++;
+
+        const unsigned shift = 15 - scale;
 
         for (unsigned j = 0; j < n; j++)
         {
             const int32_t w = window[j];
+            int16_t *o = out + 2 * order[j];
 
-            // 10-bit samples times a Q15 window: >> 9 maps full scale to Q15.
-            out[2 * j] = sat(((field(words[j], 0) - mean_low) * w) >> 9);
-            out[2 * j + 1] = sat(((mean_high - field(words[j], 10)) * w) >> 9);
+            // |sample - mean| * 2^scale <= 16383 by the choice of scale: no clamp needed.
+            o[0] = static_cast<int16_t>(((field(words[j], 0) - mean_low) * w) >> shift);
+            o[1] = static_cast<int16_t>(((mean_high - field(words[j], 10)) * w) >> shift);
         }
 
-        return static_cast<unsigned>(peak);
+        return {static_cast<unsigned>(peak), scale};
     }
 
     void line_accumulator::configure(unsigned n_fft, unsigned bins)
@@ -103,16 +119,18 @@ namespace core
         m_count = 0;
     }
 
-    void line_accumulator::add(const int16_t *spectrum)
+    void line_accumulator::add(const int16_t *spectrum, unsigned scale)
     {
         // Kept bin s covers frequency (s - bins/2) * fs / n.
         const unsigned first = m_n - m_bins / 2;
+        const unsigned shift = 2 * (max_scale - std::min(scale, max_scale));
 
         for (unsigned s = 0; s < m_bins; s++)
         {
             const unsigned k = (first + s) & (m_n - 1);
             const int32_t re = spectrum[2 * k], im = spectrum[2 * k + 1];
-            const uint32_t power = static_cast<uint32_t>(re * re) + static_cast<uint32_t>(im * im);
+            const uint64_t power = static_cast<uint64_t>(static_cast<uint32_t>(re * re) + static_cast<uint32_t>(im * im))
+                                   << shift;
 
             m_peak[s] = std::max(m_peak[s], power);
             m_sum[s] += power;
@@ -129,8 +147,7 @@ namespace core
         {
             const unsigned lo = x * m_bins / width;
             const unsigned hi = std::max(lo + 1, (x + 1) * m_bins / width);
-            uint32_t p = 0;
-            uint64_t s = 0;
+            uint64_t p = 0, s = 0;
 
             for (unsigned b = lo; b < hi; b++)
             {
@@ -138,8 +155,8 @@ namespace core
                 s = std::max(s, m_sum[b]);
             }
 
-            peak[x] = power_code(p);
-            mean[x] = power_code(s / count);
+            peak[x] = power_code(p, code_bias_log2);
+            mean[x] = power_code(s / count, code_bias_log2);
         }
 
         reset();

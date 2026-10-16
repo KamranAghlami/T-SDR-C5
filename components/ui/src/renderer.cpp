@@ -157,8 +157,21 @@ namespace ui
         const char gain_mode = f.state.gain == core::gain_auto ? 'A' : f.state.gain == core::gain_agc ? 'H' : 'G';
         char battery[8] = "";
 
-        if (f.battery.present)
-            std::snprintf(battery, sizeof(battery), " %u%%%s", f.battery.percent, f.battery.charging ? "+" : "");
+        switch (f.battery.source)
+        {
+        case board::power_source::charging:
+        case board::power_source::discharging:
+            std::snprintf(battery, sizeof(battery), " %u%%%s", f.battery.percent,
+                          f.battery.source == board::power_source::charging ? "+" : "");
+            break;
+
+        case board::power_source::external:
+            std::snprintf(battery, sizeof(battery), " USB");
+            break;
+
+        case board::power_source::unknown:
+            break;
+        }
 
         std::snprintf(m_status_right[1], sizeof(m_status_right[1]), "%u/s %c%u%s", f.lines_per_s, gain_mode, f.gain,
                       battery);
