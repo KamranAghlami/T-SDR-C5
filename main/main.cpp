@@ -75,13 +75,14 @@ namespace
 
         if (state.menu_open)
         {
+            // B opens the menu, so B also walks it; A changes the value.
             switch (g)
             {
-            case core::gesture::short_a:
+            case core::gesture::short_b:
                 state.menu_index = static_cast<uint8_t>((state.menu_index + 1) % core::menu_items.size());
                 break;
 
-            case core::gesture::short_b:
+            case core::gesture::short_a:
             {
                 const auto item = core::menu_items[state.menu_index];
 

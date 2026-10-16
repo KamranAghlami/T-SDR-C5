@@ -127,8 +127,8 @@ Colour map: turbo (default) or grayscale/inferno. Auto-ranged dB scale
 
 | Gesture | Normal | In menu |
 |---|---|---|
-| A short | previous channel (wraps within band) | next item |
-| B short | next channel (wraps) | change value |
+| A short | previous channel (wraps within band) | change value |
+| B short | next channel (wraps) | next item |
 | A long (≥ 700 ms) | toggle band 2.4 ↔ 5 GHz (remembers the last channel per band) | — |
 | B long (≥ 700 ms) | open menu | close menu (saves) |
 | A + B together | freeze/unfreeze waterfall | — |
@@ -275,7 +275,7 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | # | Decision | Choice |
 |---|---|---|
 | D1 | Radio code base | **Upstream ESP-SDR as a pinned submodule + ported ESPsoup fast capture engine and `TUNEM`** (attributed, GPL-3.0) |
-| D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press) |
+| D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press); in the menu B walks items and A changes values (user request after HW test: fewer hand movements) |
 | D3 | USB host mode (ESPARGOS viewer compatible) | **Dropped** (2026-10-16): anyone who wants a USB SDR can flash ESP-SDR itself |
 | D4 | Language | **C++23 app/UI/DSP, C radio layer** |
 | D5 | Default view | Channel view, 80 MS/s capture, 40 MHz displayed span, peak detector |

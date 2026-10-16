@@ -75,8 +75,9 @@ Button **A** is the one labelled `USER` (IO0); button **B** is `BOOT` (IO28):
 | **B** long (0.7 s) | open the settings menu |
 | **A + B** | freeze / unfreeze the picture |
 
-In the menu, **A** moves to the next item, **B** changes its value, and a long press on either
-(or A + B) closes the menu. Changes are saved automatically.
+In the menu, **B** moves to the next item (the same button that opened it), **A** changes the
+value, and a long press on either (or A + B) closes the menu. Changes apply at once and are saved
+automatically.
 
 | Item | Values |
 |---|---|
@@ -86,6 +87,49 @@ In the menu, **A** moves to the next item, **B** changes its value, and a long p
 | Colours | Turbo / Grey |
 | Bright | 20 … 100 % |
 | About | firmware version |
+
+### Settings explained
+
+Each waterfall line is built from about 40 short snapshots of the radio (12.8 µs each) taken
+during its 40 ms. Most settings change how those snapshots turn into pixels.
+
+**Span: 20 / 40 / 80 MHz.** How much spectrum the 320-pixel width covers, centred on the channel.
+- **20 MHz** is exactly one Wi-Fi channel, at the finest detail (62.5 kHz per pixel).
+- **40 MHz** (default) shows the channel plus 10 MHz on each side. In 2.4 GHz, where channels
+  overlap, you see the neighbours bleeding in.
+- **80 MHz** shows everything the radio captures. Beyond about ±24 MHz the radio's own analog filter
+  rolls off, so signals near the edges look weaker than they are.
+
+**Detector: Peak / Mean.** How the snapshots of one line are combined for each pixel.
+- **Peak** (default) keeps the strongest value seen in any snapshot. Wi-Fi is bursty (packets last
+  microseconds to a few milliseconds), so a packet caught by even one snapshot shows up. That is
+  why Peak suits Wi-Fi. The cost is a grainier, slightly higher-looking noise floor.
+- **Mean** averages the snapshots. The noise floor gets smooth and steady signals stand out, but a
+  brief packet seen by one snapshot out of 40 nearly disappears. Use it to judge continuous signals
+  or the background noise.
+- The spectrum plot above the waterfall always shows both: the cyan trace is the mean, the yellow
+  dots a slowly decaying peak hold. The detector only affects the waterfall.
+
+**Gain: Auto / HW AGC / manual.** How much the receiver amplifies before its 10-bit ADC. Too much
+and strong signals clip (the waterfall smears, false signals appear); too little and weak signals
+sink into the noise. The number is the chip's gain-table index, not dB; higher means more gain.
+The status bar shows the mode letter and the index in use, for example `A26`.
+- **Auto** (`A`, default) holds one fixed gain and adjusts it only between lines. When a line clips,
+  the gain drops by 4 right away. After 2 s with nothing above a quarter of full scale, it rises by 2.
+  The picture stays steady and settles within a second or so of moving near a strong access point.
+- **HW AGC** (`H`) hands control to the chip's own Wi-Fi AGC, which changes the gain inside each
+  packet, as a Wi-Fi modem needs. Snapshots then get different gains, so levels jump from line to
+  line and the waterfall flickers. It's mostly there for comparison.
+- **Manual 8, 16, …** (`G`) holds one gain for good. Use it to compare channels or places under the
+  same receiver conditions, since Auto might pick a different gain at each.
+
+**Colours: Turbo / Grey.** The waterfall palette. Turbo runs blue → green → yellow → red for maximum
+contrast; Grey is monochrome. In both, the darkest colour is the noise floor and the brightest is
+about 40 dB above it. The floor is tracked automatically, so these are relative levels.
+
+**Bright: 20–100 %.** Backlight level. Lower values save battery.
+
+**About.** The firmware version. Nothing to change.
 
 ```
 ┌──────────────────────────────────────────────┐
