@@ -148,10 +148,12 @@ menu's About item. A cold boot to the first waterfall takes under 2 s.
 
 ### 3.6 Gain
 
-Default **auto-level**. On each band change or retune, a short sweep of manual gain indices
-picks the highest gain that keeps the strongest bin below about −6 dBFS, then holds it
-fixed, so the waterfall doesn't pump the way hardware AGC does on bursty packets. HW AGC and
-manual gain remain menu options. The gain index is shown in the status bar.
+Default **auto-level**: a manual gain index adjusted between lines, never within one. If a
+line's largest raw sample reaches 480/511 the gain drops by 4 at once; after 2 s with every
+sample below 128 it rises by 2. This doesn't pump the way hardware AGC does on bursty packets,
+and it needs no blocking sweep on retune. (The earlier draft planned a sweep; the continuous
+version is simpler and keeps adapting.) HW AGC and manual gain remain menu options. The gain
+mode and index are shown in the status bar.
 
 ## 4. Non-goals (v1)
 
@@ -244,10 +246,10 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 
 | M | Deliverable | Tag |
 |---|---|---|
-| M0 | Feasibility spike (this) + your HW check | — |
-| M1 | Repo skeleton, CI, release pipeline, board bring-up, radio capture → one spectrum line | — |
-| M2 | Channel view MVP: waterfall, spectrum, status, channel/band buttons, NVS | `v0.1.0` |
-| M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % | `v0.2.0` |
+| M0 | Feasibility spike + HW check — **done** | — |
+| M1 | Repo skeleton, CI, release pipeline, board bring-up, radio capture → one spectrum line — **done** | — |
+| M2 | Channel view MVP: waterfall, spectrum, status, channel/band buttons, NVS — **done, verified on HW** | `v0.1.0` ✅ |
+| M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % — **on `main`, awaiting HW test** | `v0.2.0` |
 | M4 | Stretch: band survey, USB host mode (ESPARGOS viewer compatible), web flasher | `v0.3.0` |
 
 ## 10. Testing

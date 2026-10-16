@@ -12,9 +12,10 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 [![Release](https://img.shields.io/github/v/release/KamranAghlami/t-sdr-c5?include_prereleases)](https://github.com/KamranAghlami/t-sdr-c5/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-> **Status: early development (milestone M1/M2).** The waterfall, channel and
-> band switching, and saved settings are in place. The settings menu, the fast
-> capture engine and upper-5 GHz tuning come next; see [the spec](docs/SPEC.md#9-milestones).
+> **Status:** [v0.1.0](https://github.com/KamranAghlami/t-sdr-c5/releases/tag/v0.1.0) is the
+> hardware-verified channel view. `main` adds the M3 features (fast capture, upper-5 GHz tuning,
+> auto-level gain, settings menu, battery), which are still awaiting their hardware test.
+> See [the milestones](docs/SPEC.md#9-milestones).
 
 ## Features
 
@@ -24,8 +25,11 @@ no SDR dongle and no extra hardware: just the board and its antenna.
   so you can see the overlapping 2.4 GHz neighbours.
 - Peak-hold detector by default (the right choice for bursty Wi-Fi), with a mean detector and a decaying
   peak trace on the spectrum.
-- Automatic noise-floor tracking with a 40 dB display range and the turbo colour map.
-- Remembers band, channel per band and span across power cycles.
+- Automatic noise-floor tracking with a 40 dB display range, and turbo or grey colour maps.
+- **Auto-level gain:** a fixed gain just below clipping, so the waterfall doesn't pump the way the
+  chip's hardware AGC does on every packet. Hardware AGC or a manual gain are also available.
+- Settings menu (span, detector, gain, colours, brightness, version), battery percentage.
+- Remembers band, channel per band and all settings across power cycles.
 - **Receive-only.** The firmware never transmits on purpose (see [Limitations](#limitations)).
 
 ## Hardware
@@ -65,13 +69,25 @@ Button **A** is the one labelled `USER` (IO0); button **B** is `BOOT` (IO28):
 | **A** short | previous channel (wraps around) |
 | **B** short | next channel (wraps around) |
 | **A** long (0.7 s) | switch band 2.4 ↔ 5 GHz; each band remembers its channel |
-| **B** long (0.7 s) | cycle span 20 → 40 → 80 MHz (becomes the settings menu in M3) |
+| **B** long (0.7 s) | open the settings menu |
 | **A + B** | freeze / unfreeze the picture |
+
+In the menu, **A** moves to the next item, **B** changes its value, and a long press on either
+(or A + B) closes the menu. Changes are saved automatically.
+
+| Item | Values |
+|---|---|
+| Span | 20 / 40 / 80 MHz |
+| Detector | Peak (default) / Mean |
+| Gain | Auto (auto-level) / HW AGC / manual 8, 16, … |
+| Colours | Turbo / Grey |
+| Bright | 20 … 100 % |
+| About | firmware version |
 
 ```
 ┌──────────────────────────────────────────────┐
 │ 2.4G CH6 2437                  40MHz PEAK    │  band, channel, centre MHz | span, detector
-│                                25/s G42      │  waterfall lines/s, PHY gain index
+│                            25/s A42 87%      │  lines/s, gain (A=auto H=HW AGC G=manual), battery
 ├──────────────────────────────────────────────┤
 │  live spectrum: mean (cyan) + peak hold      │  10 dB grid lines
 ├──────────────────────────────────────────────┤
@@ -114,7 +130,8 @@ flowchart LR
 - Levels are uncalibrated dB. Expect a small residual spike at the centre (zero-IF DC/LO
   leakage, mostly removed) and faint mirror images of very strong signals.
 - The passband is flat to about ±20 MHz. In the 80 MHz span, the edges are attenuated.
-- Until the M3 tuning path lands, channels above about 5745 MHz (UNII-3/4) are roughly 20 dB less sensitive.
+- 5 GHz uses the Wi-Fi driver's PLL path (as measured by ESPsoup) to stay sensitive above
+  5745 MHz. Individual boards can still have dead spots.
 - No reception below about 2.1 GHz on this chip.
 - Receive-only, but not RF-silent: the stock PHY start-up and background calibration
   can emit short internal calibration signals, as on any ESP32 Wi-Fi firmware.
