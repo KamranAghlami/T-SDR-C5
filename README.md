@@ -14,6 +14,12 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-0a6fd6)](https://kamranaghlami.github.io/T-SDR-C5/)
 
+<p align="center">
+  <img src="docs/images/detail-5g.jpg" width="49%" alt="Detail view: spectrum and waterfall around 5245 MHz, 40 MHz span, peak detector">
+  <img src="docs/images/band-24g.jpg" width="49%" alt="Band view: survey of 2130–2730 MHz with Wi-Fi activity around channels 1–11, mean detector">
+</p>
+<p align="center"><em>Left: detail view at 5245 MHz (40 MHz span, peak hold). Right: band survey of 2130–2730 MHz, tuned to 2437 MHz.</em></p>
+
 > **Status:** [v0.3.0](https://github.com/KamranAghlami/T-SDR-C5/releases/latest): detail and band views,
 > tuning by frequency over 2130–2730 and 4790–5990 MHz, auto-level gain, settings menu and battery,
 > verified on hardware. Flash it [from the browser](https://kamranaghlami.github.io/T-SDR-C5/).
