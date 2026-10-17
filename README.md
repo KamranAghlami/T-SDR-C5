@@ -14,10 +14,9 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Flash in browser](https://img.shields.io/badge/flash-in%20browser-0a6fd6)](https://kamranaghlami.github.io/T-SDR-C5/)
 
-> **Status:** [v0.2.x](https://github.com/KamranAghlami/T-SDR-C5/releases/latest) is the detail view (fast
-> capture, upper-5 GHz tuning, auto-level gain, settings menu, battery), verified on hardware.
-> `main` adds the band survey and tuning by frequency. Flash it
-> [from the browser](https://kamranaghlami.github.io/T-SDR-C5/).
+> **Status:** [v0.3.0](https://github.com/KamranAghlami/T-SDR-C5/releases/latest): detail and band views,
+> tuning by frequency over 2130–2730 and 4790–5990 MHz, auto-level gain, settings menu and battery,
+> verified on hardware. Flash it [from the browser](https://kamranaghlami.github.io/T-SDR-C5/).
 
 ## Features
 

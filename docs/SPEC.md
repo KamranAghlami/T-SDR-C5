@@ -6,7 +6,7 @@ path), computes FFTs on the chip and shows a live spectrum and waterfall on the
 1.9" LCD: around any frequency from 2130–2730 or 4790–5990 MHz, or a whole range
 at once. Two buttons tune and drive a small settings menu.
 
-Status: decisions D1–D7 (§12) are implemented; v0.1.0 and v0.2.x are released and
+Status: decisions D1–D7 (§12) are implemented; v0.1.0 to v0.3.0 are released and
 verified on hardware. §1 is the original feasibility study, kept as a record.
 
 ---
@@ -200,8 +200,8 @@ UI task (higher priority, blocks on SPI): waterfall ring (PSRAM) → 2 × 320×1
 The snapshot target is missed by a little. Per 1024-point capture the DSP was ≈210k
 instructions (FFT 148k, `prepare_iq` 47k, accumulation 15k); the radix-4 passes cut the FFT
 to ≈111k (RISC-V GCC: 92 instructions per 4 points over two stages instead of 4 × 32),
-about 17 % of the total, so ≈28–30 snapshots per line are expected. Still to measure on
-hardware.
+about 17 % of the total, so ≈28–30 snapshots per line are expected. Verified working on
+hardware in v0.3.0.
 
 ### 5.3 Memory plan
 
@@ -276,7 +276,7 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | M1 | Repo skeleton, CI, release pipeline, board bring-up, radio capture → one spectrum line — **done** | — |
 | M2 | Channel view MVP: waterfall, spectrum, status, channel/band buttons, NVS — **done, verified on HW** | `v0.1.0` ✅ |
 | M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % — **done, verified on HW** | `v0.2.0` ✅ |
-| M4 | Browser flasher (GitHub Pages; esptool-js, version selector, serial console, settings-preserving updates) — **done**; band survey; tuning by frequency — **on `main`, awaiting HW test** | `v0.3.0` |
+| M4 | Browser flasher (GitHub Pages; esptool-js, version selector, serial console, settings-preserving updates) — **done**; band survey; tuning by frequency — **done, verified on HW** | `v0.3.0` ✅ |
 
 ## 10. Testing
 
@@ -307,6 +307,6 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, now frequency steps per D6, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press); in the menu B walks items and A changes values (user request after HW test: fewer hand movements) |
 | D3 | USB host mode (ESPARGOS viewer compatible) | **Dropped** (2026-10-16): anyone who wants a USB SDR can flash ESP-SDR itself |
 | D4 | Language | **C++23 app/UI/DSP, C radio layer** |
-| D5 | Default view | Detail view (first called "channel view"), 80 MS/s capture, 40 MHz displayed span, peak detector |
+| D5 | Default view | Detail view, 80 MS/s capture, 40 MHz displayed span, peak detector |
 | D6 | Tuning (2026-10-16) | **By frequency, not Wi-Fi channel**: ranges 2130–2730 / 4790–5990 MHz (ESPsoup's exact-tuning limits), Step 1/5/10/20 MHz in the menu; band view = whole range, cursor moves by the step; settings v4 migrates saved channels |
-| D7 | Band survey | Menu item View: Detail / Band (A+B stays freeze); menu "About" renamed "Version"; stitched 40 MHz steps, passband shape learned from the quietest step per offset and removed; centre bins blanked |
+| D7 | Band survey | Menu item View: Detail / Band (A+B stays freeze); stitched 40 MHz steps, passband shape learned from the quietest step per offset and removed; centre bins blanked |
