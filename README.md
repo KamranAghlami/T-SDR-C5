@@ -100,12 +100,12 @@ automatically.
 
 ### Settings explained
 
-Each waterfall line is built from about 40 short snapshots of the radio (12.8 µs each) taken
+Each waterfall line is built from around 30 short snapshots of the radio (12.8 µs each) taken
 during its 40 ms. Most settings change how those snapshots turn into pixels.
 
 **View: Channel / Band.** *Channel* shows the span around the tuned frequency in detail. *Band*
 sweeps the whole range in 40 MHz steps and stitches them into one line: 15 steps for 2130–2730 MHz,
-30 for 4790–5990 MHz, at about 20 lines/s. The bar on the band view's axis marks what the channel
+30 for 4790–5990 MHz (about 1 ms per retune, so roughly 15–25 lines/s). The bar on the band view's axis marks what the channel
 view would show; switch back to *Channel* to look there in detail. Every 40 MHz capture passes noise
 more strongly at its centre than at its edges. The band view learns that shape from the quietest steps
 and divides it out, so for about a second after switching ranges the floor can look uneven.
@@ -123,7 +123,7 @@ frequency.
   microseconds to a few milliseconds), so a packet caught by even one snapshot shows up. That is
   why Peak suits Wi-Fi. The cost is a grainier, slightly higher-looking noise floor.
 - **Mean** averages the snapshots. The noise floor gets smooth and steady signals stand out, but a
-  brief packet seen by one snapshot out of 40 nearly disappears. Use it to judge continuous signals
+  brief packet seen by one snapshot out of 30 nearly disappears. Use it to judge continuous signals
   or the background noise.
 - The spectrum plot above the waterfall always shows both: the cyan trace is the mean, the yellow
   dots a slowly decaying peak hold. The detector only affects the waterfall.

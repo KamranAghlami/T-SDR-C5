@@ -44,7 +44,7 @@ namespace core
         // Passband correction is limited to +-12 dB.
         static constexpr int32_t max_correction_q8 = 4 * 256;
 
-        void configure(const survey_plan &plan, unsigned n_fft, unsigned sample_rate_hz, unsigned width);
+        void configure(const survey_plan &plan, unsigned n_fft, unsigned rate_hz, unsigned width);
 
         // FFT of a capture taken at plan.centres_mhz[step]; `scale` from prepare_iq.
         // Captures arrive step by step (all of step 0, then step 1, ...).

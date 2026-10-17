@@ -29,10 +29,10 @@ namespace core
         return static_cast<int>((mhz - plan.low_mhz) * width / (plan.high_mhz - plan.low_mhz));
     }
 
-    void survey_accumulator::configure(const survey_plan &plan, unsigned n_fft, unsigned sample_rate_hz, unsigned width)
+    void survey_accumulator::configure(const survey_plan &plan, unsigned n_fft, unsigned rate_hz, unsigned width)
     {
         const uint64_t span_hz = (plan.high_mhz - plan.low_mhz) * 1'000'000ull;
-        const uint64_t bin_hz = sample_rate_hz / n_fft;
+        const uint64_t bin_hz = rate_hz / n_fft;
 
         m_n = n_fft;
         m_width = width;

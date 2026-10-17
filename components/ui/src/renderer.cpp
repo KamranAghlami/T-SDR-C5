@@ -122,6 +122,25 @@ namespace ui
 
     void renderer::show(const frame &f)
     {
+        const unsigned mhz = f.state.current_mhz();
+        const bool band_view = f.state.view == core::view_id::band;
+        // What each pixel means. In the band view the cursor moves without
+        // changing it, so the waterfall survives cursor moves.
+        const uint32_t mapping = band_view ? 0x80000000u | static_cast<uint32_t>(f.state.band)
+                                           : (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
+        // The axis also shows the cursor and the channel-view span.
+        const uint32_t axis = (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
+
+        if (mapping != m_mapping)
+        {
+            m_mapping = mapping;
+            m_hold.fill(0);
+            m_floor.reset();
+            std::memset(m_waterfall, 0, waterfall_h * width);
+            m_axis_key = ~axis; // force an axis rebuild
+        }
+
+        // Only after the mapping check, so a retune's first line is kept.
         if (f.new_line)
         {
             m_floor.update(f.mean.data(), width);
@@ -139,24 +158,6 @@ namespace ui
                 // Peak hold decays by 0.5 dB per line.
                 m_hold[x] = std::max<uint8_t>(m_hold[x] > 0 ? m_hold[x] - 1 : 0, f.peak[x]);
             }
-        }
-
-        const unsigned mhz = f.state.current_mhz();
-        const bool band_view = f.state.view == core::view_id::band;
-        // What each pixel means. In the band view the cursor moves without
-        // changing it, so the waterfall survives cursor moves.
-        const uint32_t mapping = band_view ? 0x80000000u | static_cast<uint32_t>(f.state.band)
-                                           : (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
-        // The axis also shows the cursor and the channel-view span.
-        const uint32_t axis = (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
-
-        if (mapping != m_mapping)
-        {
-            m_mapping = mapping;
-            m_hold.fill(0);
-            m_floor.reset();
-            std::memset(m_waterfall, 0, waterfall_h * width);
-            m_axis_key = ~axis; // force an axis rebuild
         }
 
         if (axis != m_axis_key)

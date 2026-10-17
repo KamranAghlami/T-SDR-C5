@@ -73,6 +73,7 @@ namespace
         bool regain = false;
         bool brightness = false;
         bool save = false;
+        bool restart_line = false; // drop a partly built line (e.g. after a freeze)
     };
 
     effects apply(core::gesture g, core::state &state)
@@ -146,6 +147,7 @@ namespace
 
         case core::gesture::both:
             state.frozen = !state.frozen;
+            e.restart_line = true;
             break;
 
         case core::gesture::none:
@@ -225,6 +227,14 @@ namespace
 
                 if (e.save)
                     save_at = esp_timer_get_time() + save_delay_us;
+
+                if (e.restart_line)
+                {
+                    accumulator.reset();
+                    survey.reset();
+                    line_peak = 0;
+                    next_line = esp_timer_get_time() + line_period_us;
+                }
 
                 last_frame = 0; // show the change right away
             }
