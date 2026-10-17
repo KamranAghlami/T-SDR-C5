@@ -105,8 +105,8 @@ during its 40 ms. Most settings change how those snapshots turn into pixels.
 
 **View: Channel / Band.** *Channel* shows the span around the tuned frequency in detail. *Band*
 sweeps the whole range in 40 MHz steps and stitches them into one line: 15 steps for 2130–2730 MHz,
-30 for 4790–5990 MHz (about 1 ms per retune, so roughly 15–25 lines/s). The bar on the band view's axis marks what the channel
-view would show; switch back to *Channel* to look there in detail. Every 40 MHz capture passes noise
+30 for 4790–5990 MHz (about 1 ms per retune, so roughly 15–25 lines/s). The bar on the band view's
+axis marks what the channel view would show; switch back to *Channel* to look there in detail. Every 40 MHz capture passes noise
 more strongly at its centre than at its edges. The band view learns that shape from the quietest steps
 and divides it out, so for about a second after switching ranges the floor can look uneven.
 

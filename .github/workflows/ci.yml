@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Per event too: a manual Pages redeploy must not cancel a push build of the same ref.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
@@ -74,12 +75,14 @@ jobs:
         run: |
           source .esp-idf/export.sh
           defaults="sdkconfig.defaults"
+          version=$(git describe --tags --always --dirty)
           if [ "$VARIANT" = stats ]; then
             # The statistics are INFO messages; release builds compile those out.
             printf 'CONFIG_T_SDR_C5_STATS_LOG=y\nCONFIG_LOG_DEFAULT_LEVEL_INFO=y\n' > sdkconfig.stats
             defaults="$defaults;sdkconfig.stats"
+            version="$version-stats" # shown in the boot log and the menu's About item
           fi
-          idf.py -B build -DSDKCONFIG_DEFAULTS="$defaults" build
+          idf.py -B build -DSDKCONFIG_DEFAULTS="$defaults" -DPROJECT_VER="$version" build
           idf.py -B build merge-bin -o "$PWD/build/merged.bin"
 
       - name: Check SRAM headroom

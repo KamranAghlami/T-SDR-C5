@@ -1,14 +1,16 @@
 # t-sdr-c5 — notes for Claude
 
-Handheld Wi-Fi waterfall for the LilyGO T-Display-C5 (ESP32-C5), receive-only
-SDR built on ESPARGOS/esp-sdr. Specification: [SPEC.md](SPEC.md).
+Handheld spectrum/waterfall for the LilyGO T-Display-C5 (ESP32-C5): a receive-only
+SDR on ESPARGOS/esp-sdr, tuned by frequency over 2130–2730 and 4790–5990 MHz,
+with a channel view and a band-survey view. Specification: [SPEC.md](SPEC.md).
 
 ## Layout
 
 - `components/c5_radio` (C): tune/gain/bandwidth/capture; compiles upstream
   calibration sources straight from `third_party/esp-sdr` (pinned submodule).
-- `components/core` (C++23, no ESP-IDF APIs): channels, gestures, FFT,
-  spectrum line, colour maps. Also built by `tests/host`.
+- `components/core` (C++23, no ESP-IDF APIs): state/tuning ranges, gestures,
+  FFT, spectrum line, band survey (passband learning), menu, gain, colour maps.
+  Also built by `tests/host` (ASan/UBSan) — test changes there first.
 - `components/board` (C++): LCD, backlight, buttons. `components/ui`: renderer.
 - `main`: control/radio loop (prio 4) + UI task (prio 5, blocks on SPI).
 

@@ -61,8 +61,9 @@ namespace core
         const uint32_t mantissa = table[static_cast<unsigned>(log2_q8_value) & 255u]; // 2^frac in Q16
         const int shift = 8 + whole - 16; // result in Q8
 
+        // The mantissa uses up to 17 bits, so shifts above 14 would overflow.
         if (shift >= 0)
-            return shift > 15 ? UINT32_MAX : mantissa << shift;
+            return shift > 14 ? UINT32_MAX : mantissa << shift;
 
         return shift < -31 ? 0 : (mantissa + (1u << (-shift - 1))) >> -shift;
     }
@@ -125,7 +126,9 @@ namespace core
             const int32_t w = window[j];
             int16_t *o = out + 2 * order[j];
 
-            // |sample - mean| * 2^scale <= 16383 by the choice of scale: no clamp needed.
+            // |sample - mean| * 2^scale <= 16383 by the choice of scale; flooring a
+            // negative product can reach -16384, which the FFT still handles
+            // (its halving stages only need complex magnitudes below 32768).
             o[0] = static_cast<int16_t>(((field(words[j], 0) - mean_low) * w) >> shift);
             o[1] = static_cast<int16_t>(((mean_high - field(words[j], 10)) * w) >> shift);
         }

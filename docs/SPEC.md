@@ -1,20 +1,21 @@
-# t-sdr-c5 — Specification (v0.2, decisions recorded)
+# t-sdr-c5 — Specification (v0.3)
 
 A pocket spectrum/waterfall gadget for the **LilyGO T-Display-C5**. It uses the
 ESP32-C5's own Wi-Fi radio as a receive-only SDR (the ESP-SDR raw-IQ debug
-path), computes FFTs on the chip and shows a live waterfall of a 2.4 GHz or 5 GHz
-Wi-Fi channel on the 1.9" LCD. Two buttons switch channels and bands.
+path), computes FFTs on the chip and shows a live spectrum and waterfall on the
+1.9" LCD: around any frequency from 2130–2730 or 4790–5990 MHz, or a whole range
+at once. Two buttons tune and drive a small settings menu.
 
-Status: **v0.2. Design decisions recorded (§12)**, pending final sign-off
-and the on-hardware spike check. The flashable spike image
-(`feasibility-tdisplay` artifact, see `spike/README.md`) answers the remaining hardware questions.
+Status: decisions D1–D7 (§12) are implemented; v0.1.0 and v0.2.x are released and
+verified on hardware. §1 is the original feasibility study, kept as a record.
 
 ---
 
 ## 1. Feasibility verdict
 
-**Feasible.** No blocker found. The risks that remain need a hardware check on
-your board (§11), and the spike image in the `feasibility` branch exists to answer them.
+**Feasible** (2026-10-16). No blocker was found; the open hardware questions were
+answered by the feasibility spike on the user's board (§11). Figures below are
+from that study; current measurements are in §5.2.
 
 | # | Question | Finding | Evidence | Verdict |
 |---|---|---|---|---|
@@ -69,7 +70,7 @@ CI fails if headroom drops below 8 KiB.
 
 | Function | GPIO | Notes |
 |---|---|---|
-| LCD SCK / MOSI / DC / CS / RST | 7 / 9 / 8 / 26 / 23 | ST7789, 170×320 IPS, used landscape 320×170, BGR, inverted, gap (0, 35) |
+| LCD SCK / MOSI / DC / CS / RST | 7 / 9 / 8 / 26 / 23 | ST7789, 170×320 IPS, used landscape 320×170, **RGB** element order (LilyGO's sample code says BGR, which is wrong for esp_lcd), inverted, gap (0, 35) |
 | LCD backlight | 25 | LEDC PWM for brightness |
 | Button **A** "USER" | 0 | active low, internal pull-up |
 | Button **B** "BOOT" | 28 | active low, strapping pin (fine as input after boot) |
@@ -81,125 +82,141 @@ CI fails if headroom drops below 8 KiB.
 
 ## 3. Functional specification
 
-### 3.1 Bands and channels
+### 3.1 Tuning ranges
 
-* **2.4 GHz:** ch 1–13 (2412–2472 MHz, 5 MHz raster) and ch 14 (2484 MHz).
-* **5 GHz (20 MHz channels):** 36–64 (UNII-1/2), 100–144 (UNII-2e), 149–165 (UNII-3),
-  169–177 (UNII-4). Ch ≥ 100 use the `TUNEM` Wi-Fi-driver tuning path.
-* The receiver is **receive-only**. The firmware never transmits. No region restrictions apply.
+* **2.4G range: 2130–2730 MHz**, **5G range: 4790–5990 MHz**: the receive LO's exact-tuning
+  limits as measured by ESPsoup (CW generator, several boards). They hold Wi-Fi, the 13 cm
+  amateur band, 5.8 GHz FPV and more. Below about 2.1 GHz the LO doesn't follow.
+* Tuning is by **frequency in whole MHz** (D6). Short A/B tune by the **Step** (1 / 5 / 10 /
+  20 MHz, default 5), wrapping at the range ends; each range remembers its own frequency.
+* Above 3 GHz the PLL is programmed through the Wi-Fi driver path (ESPsoup's `TUNEM 2`);
+  the stock path is about 20 dB less sensitive above about 5745 MHz.
+* The receiver is **receive-only**; the firmware never transmits on purpose (the stock PHY
+  calibration can emit short internal signals, as on any ESP32 Wi-Fi firmware).
 
 ### 3.2 Views
 
-**Channel view (MVP).** Centred on the selected channel:
+**Channel view.** Centred on the tuned frequency:
 
-* Capture: 80 MS/s, analog bandwidth 48 MHz (widest), 1024-pt FFT, Hann window.
-* Displayed span: the **centre 40 MHz** (512 bins → 320 px, max-combined) so
-  neighbouring/overlapping 2.4 GHz channels are visible. Spans of 20 / 40 / 80 MHz can be picked
-  in the menu (80 MHz shows the full capture with the analog roll-off beyond ±24 MHz greyed).
-* Per waterfall line: as many snapshots as fit the frame budget (target ≥ 40),
-  combined as **peak** (default, best for bursty Wi-Fi) or **mean**.
-* DC spike at the centre suppressed (ESP-SDR `spectrum_dc_apply`).
+* Capture: 80 MS/s, widest analog bandwidth (PHY mode 1, ≈48 MHz), 1024-point FFT, Hann
+  window, mean removed per capture (DC/LO leakage).
+* Displayed span 20 / 40 (default) / 80 MHz; the kept bins are max-combined into 320 px.
+  At 80 MHz the analog roll-off beyond about ±24 MHz is visible.
+* Per waterfall line (40 ms): as many snapshots as fit (≈25 measured), combined as **peak**
+  (default, best for bursty signals) or **mean**.
 
-**Band survey (v1.1, stretch).** A stitched sweep of the whole band, one line per sweep:
-2.4 GHz (2400–2500 MHz, 3 steps) about 20 lines/s; 5 GHz (5150–5895 MHz, 19 steps)
-about 5–8 lines/s, with channel markers on the axis.
+**Band view** (D7). The whole range in one line:
+
+* Stitched sweep in 40 MHz steps (15 for the 2.4G range, 30 for 5G); each step retunes
+  without a DC measurement (≈1 ms), takes at least one snapshot and keeps the flat ±20 MHz.
+* The receiver's passband shape (noise strongest at a capture's centre) is learned per bin
+  offset from the quietest step of each line, smoothed over ≈16 lines and divided out
+  (≤ ±12 dB). The 5 bins around each step's centre (DC/LO leakage) are skipped and their
+  pixels filled from the neighbours.
+* Short A/B move a cursor by the Step; the axis bar shows the span the channel view would
+  display there, and switching View back to Channel opens it.
 
 ### 3.3 Screen layout (320 × 170, landscape)
 
 ```
 ┌──────────────────────────────────────────────┐  y
-│ 2.4G  CH 6  2437 MHz   40M  PK  G:A  25fps ▮▮ │  0–15   status bar
+│ 2.4G 2437 MHz                  40MHz PEAK    │  0–15   range + frequency | span (BAND) + detector
+│                            25/s A26 87%      │         lines/s, gain mode+index, power
 ├──────────────────────────────────────────────┤
-│        ╱╲    ___                               │ 16–55   live spectrum (mean) + decaying peak trace
+│        ╱╲    ___                               │ 16–55   spectrum: mean (cyan) + decaying peak hold
 │ ______╱  ╲__╱   ╲_______                       │
-├──┬─────┬─────┬─────┬─────┬────────────────────┤ 56–67   axis: MHz ticks + channel markers (current highlighted)
-│ 2420  2430  2440  2450   │ 4  5 [6] 7  8       │
+├──────────────────────────────────────────────┤ 56–67   axis: bar (20 MHz / band: the span), MHz labels,
+│ ▔▔▔▔▔▔ 2430  2440  2450                       │         ticks below the labels
 ├──────────────────────────────────────────────┤
-│▓▓▒▒░░  ░░▒▒▓▓█████▓▓▒░░                      │ 68–169  waterfall, 102 lines (≈4 s at 25 lines/s), newest on top
-│ ...                                          │
+│▓▓▒▒░░  ░░▒▒▓▓█████▓▓▒░░                      │ 68–169  waterfall, 102 lines, newest on top
 └──────────────────────────────────────────────┘
 ```
 
-Colour map: turbo (default) or grayscale/inferno. Auto-ranged dB scale
-(noise floor tracked per band, configurable offset).
+Colours (turbo or grey) are relative to the tracked noise floor (20th percentile, smoothed):
+40 dB from floor to top. The status bar turns orange while frozen, red without captures.
+The menu (8 items) covers rows 16–169 while open.
 
 ### 3.4 Buttons (A = IO0 "USER", B = IO28 "BOOT")
 
 | Gesture | Normal | In menu |
 |---|---|---|
-| A short | previous channel (wraps within band) | change value |
-| B short | next channel (wraps) | next item |
-| A long (≥ 700 ms) | toggle band 2.4 ↔ 5 GHz (remembers the last channel per band) | — |
-| B long (≥ 700 ms) | open menu | close menu (saves) |
-| A + B together | freeze/unfreeze waterfall | — |
+| A short | tune down by the step (band view: move the cursor) | change the value |
+| B short | tune up by the step (band view: move the cursor) | next item |
+| A long (≥ 700 ms) | switch range 2.4G ↔ 5G | close |
+| B long (≥ 700 ms) | open the menu | close |
+| A + B together | freeze / unfreeze (restarts the line) | close |
 
-No auto-repeat: a hold is a long press. Channel steps wrap in both directions, so
-stepping by clicks is quick. Until the menu lands (M3), B long cycles the span 20/40/80 MHz.
-Menu items: span, detector (peak/mean), gain (auto-level / HW AGC / manual 0…max),
-colour map, brightness, view (channel/band survey), about (version).
+No auto-repeat (a hold is a long press). Menu items: View, Span, Step, Detector, Gain
+(Auto / HW AGC / manual 8, 16, …), Colours, Bright, About (version).
 
 ### 3.5 Persistence and boot
 
-Band, channel per band, span, detector, gain, colour map and brightness are
-stored in NVS (written after 2 s without changes, to limit flash wear). Boot: the panel is
-cleared while the radio initialises (backlight off), then the last channel shows. No splash
-screen (dropped after the first hardware test); the version is in the boot log and the
-menu's About item. A cold boot to the first waterfall takes under 2 s.
+View, range, frequency per range, span, step, detector, gain, colour map and brightness
+are stored in NVS (layout v4), written 2 s after the last change to limit flash wear.
+Older layouts are read (v1–3 stored a Wi-Fi channel index, converted to its frequency).
+Boot: the panel is cleared with the backlight off while the radio initialises (≈1 s, no
+splash); the version is in the boot log and the menu's About item.
 
 ### 3.6 Gain
 
 Default **auto-level**: a manual gain index adjusted between lines, never within one. If a
 line's largest raw sample reaches 480/511 the gain drops by 4 at once; after 2 s with every
-sample below 128 it rises by 2. This doesn't pump the way hardware AGC does on bursty packets,
-and it needs no blocking sweep on retune. (The earlier draft planned a sweep; the continuous
-version is simpler and keeps adapting.) HW AGC and manual gain remain menu options. The gain
-mode and index are shown in the status bar.
+sample below 128 it rises by 2. Unlike the chip's hardware AGC it doesn't change gain inside
+packets, so the waterfall doesn't pump. HW AGC and manual gain remain menu options; the
+status bar shows the mode letter (A/H/G) and the index in use.
 
 ## 4. Non-goals (v1)
 
 Demodulation/audio (the board has no speaker), transmitting, packet decoding,
-continuous I/Q streaming to a PC, touch input, Wi-Fi/BLE connectivity
-(the radio is busy being an SDR).
+continuous I/Q streaming to a PC or a USB SDR mode (D3: flash ESP-SDR for that), touch
+input, Wi-Fi/BLE connectivity (the radio is busy being an SDR).
 
 ## 5. Signal chain and performance
 
-### 5.1 Pipeline (single core, cooperative)
+### 5.1 Pipeline (single core, two tasks)
 
 ```
-fast snapshot (80 MS/s × 1024, bank 1) → copy/convert to Q15 + window → FFT 1024 (Q15, radix-2;
-radix-4/8 later) → |X|² → DC fix → accumulate peak/mean (512 centre bins)
-   … repeat until line deadline …
-→ bin→pixel max-combine (512→320) → log (spectrum_power_code, 0.5 dB steps) → line ring (PSRAM)
-→ render status/spectrum/axis/waterfall into 2 × 320×16 DMA bands → SPI DMA (overlaps next captures)
+fast snapshot (80 MS/s × 1024 → SRAM bank 1, register-level engine)
+→ prepare_iq: mean removal, Hann window, block scale (fills ±16384), bit-reversed order
+→ FFT 1024 (Q15, no saturation; stages 1–2 as one multiply-free radix-4 pass)
+→ |X|² normalised to a common scale → accumulate peak/mean
+   channel view: until the 40 ms line deadline; band view: per sweep step
+→ bins → 320 px, log (0.5 dB codes) → frame queue
+UI task (higher priority, blocks on SPI): waterfall ring (PSRAM) → 2 × 320×16 DMA bands
 ```
 
-### 5.2 Targets
+### 5.2 Targets and measurements (hardware, 2026-10-16/17)
 
-| Metric | Target |
-|---|---|
-| Waterfall line rate | ≥ 20 lines/s (goal 25) |
-| Button → retuned display | ≤ 150 ms (incl. DC recalibration) |
-| Snapshots per line | ≥ 30 (goal 45) |
-| RF time coverage | ≈ 1–3 % (sampling analyser, §5.4) |
-| Frequency resolution | 78 kHz/bin, 125 kHz/px at 40 MHz span |
-| SPI clock | 40 MHz (80 MHz if the panel tolerates it) |
+| Metric | Target | Measured |
+|---|---|---|
+| Channel-view line rate | ≥ 20 lines/s | 25–26 |
+| Snapshots per line | ≥ 30 | 24–25 (channel view), ≈35 (2.4G band, older 3-step plan) |
+| Capture / DSP per snapshot | — | ≈70 µs / ≈1.0 ms (was 1.45 ms before §5.1's FFT changes) |
+| Band-view retune | — | ≈1.0 ms per step |
+| Band-view line rate | — | 24 (3 steps), 19 (19 steps); 15/30-step ranges ≈15–25 expected |
+| UI CPU per frame | — | ≈3.5 ms |
+| Noise-floor accuracy of the fixed-point path | — | within 0.02 dB of double precision, 0.5–50 LSB rms (host test) |
+
+The snapshot target is missed by a little: the FFT dominates. Further radix-4 stages
+would cut DSP time by roughly a third.
 
 ### 5.3 Memory plan
 
-* Bank 1 (128 KiB): owned by the RF dump; never heap. Capture data is read
-  only after ownership returns.
-* Internal SRAM (banks 0/2): DMA bands 20 KiB, FFT work ≈ 14 KiB, stacks, Wi-Fi.
-* PSRAM: waterfall history (320 × 102 × 1 B), peak traces, UI state.
+* Bank 1 (128 KiB): owned by the RF dump; never heap. Capture data is read only after
+  ownership returns.
+* Internal SRAM: DMA bands 20 KiB, FFT work buffers, stacks, Wi-Fi; ≈60–70 KiB stays free.
+* PSRAM: waterfall history (320 × 102 B), axis cache, Wi-Fi/lwip `.bss`.
+* Static sections: ≈30 KiB headroom below the dump bank; CI fails below 8 KiB.
 
-### 5.4 Honest limitations (go into the README)
+### 5.4 Limitations (also in the README)
 
-* **Sampling, not gapless.** Each line looks at ≈0.5–1 ms of RF out of 40 ms.
+* **Sampling, not gapless.** Each 40 ms line looks at well under 1 ms of RF.
   Busy channels and beacons show clearly, but a single short burst can be missed.
-* Uncalibrated dB. Zero-IF DC spike at the centre (suppressed, not perfect).
-  Image/IQ imbalance is visible on strong signals.
-* Passband is flat to about ±20 MHz; edges beyond are attenuated and labelled.
-* Stock tuning path is weak above about 5745 MHz (fixed by `TUNEM`). Board-to-board dead
-  spots are possible (ESPsoup saw 4960–5020 MHz deaf on one board).
+* Uncalibrated dB. Residual DC/LO leakage at the centre (mean removal, not perfect);
+  image/IQ imbalance is visible on strong signals.
+* Passband flat to about ±20 MHz; the 80 MHz span shows the roll-off.
+* The tuning limits are ESPsoup's boards' figures; individual chips can differ near the ends,
+  and board-specific dead spots are possible (ESPsoup saw 4960–5020 MHz deaf on one).
 
 ## 6. Software architecture
 
@@ -207,33 +224,38 @@ radix-4/8 later) → |X|² → DC fix → accumulate peak/mean (512 centre bins)
 t-sdr-c5/
 ├─ third_party/esp-sdr/        git submodule, pinned (ESPARGOS/esp-sdr)
 ├─ components/
-│  ├─ c5_radio/                C: tune, gain, bandwidth, DC recal, fast capture
-│  │                           (builds upstream common/*.c from the submodule +
-│  │                           ported ESPsoup engine & TUNEM; linker guard + --wrap opts)
+│  ├─ c5_radio/                C: tune (normal + fast), gain, bandwidth, DC recal, capture
+│  │                           (upstream calibration sources from the submodule, ported
+│  │                           ESPsoup engine & TUNEM; linker guard + --wrap options)
+│  ├─ core/                    C++23, no ESP-IDF APIs: state/tuning, gestures, FFT,
+│  │                           spectrum line, band survey, menu, gain, colour maps
 │  ├─ board/                   C++: LCD (esp_lcd ST7789), backlight, buttons, battery
-│  ├─ dsp/                     C++: window, FFT, accumulators, bin mapping, dB/colour LUT
-│  └─ ui/                      C++: renderer (status, spectrum, axis, waterfall), menu
-├─ main/                       app: state machine, settings (NVS), pipeline loop
-├─ tests/host/                 host unit tests (channel tables, bin mapping, dB LUT)
-├─ docs/                       SPEC.md, CLAUDE.md, memory/, hardware notes
+│  └─ ui/                      C++: renderer (status, spectrum, axis, waterfall, menu)
+├─ main/                       control/radio loop, UI task, settings (NVS)
+├─ tests/host/                 host unit tests of core (ASan/UBSan)
+├─ tools/                      headroom check, release packaging, flasher site
+├─ web/                        browser flasher page (esptool-js)
+├─ docs/                       SPEC.md, CLAUDE.md, memory/
 ├─ idf-ref                     pinned ESP-IDF commit (single source of truth)
-└─ .github/workflows/          ci.yml, release.yml
+└─ .github/workflows/ci.yml    tests, firmware, release, Pages
 ```
 
-* ESP-IDF at the pinned commit; `MINIMAL_BUILD`; component manager off (no
-  registry downloads, reproducible builds); the esp-dsp submodule comes from upstream.
+* ESP-IDF at the pinned commit; `MINIMAL_BUILD`; component manager off (reproducible).
 * No LVGL: a purpose-built renderer is lighter on SRAM and faster for a waterfall.
-* App in C++ (matching your `t_display_c5` template), radio layer in C (upstream-derived).
+* App in C++, radio layer in C (upstream-derived).
 
-## 7. Build, CI and releases (GitHub Actions)
+## 7. Build, CI and releases (GitHub Actions, `ci.yml`)
 
-* **ci.yml** (push/PR): host unit tests → firmware build at the pinned IDF (cached
-  `~/.espressif`, shallow IDF checkout) → size/headroom report in the job summary →
-  artifact. A drift check fails if `idf-ref` ≠ upstream's C5 pin in the submodule.
-* **release.yml** (tag `v*`): same build, then a GitHub Release with
-  `t-sdr-c5-<ver>-merged.bin` (flash at `0x0`), bootloader/partition/app bins,
-  `flash_args`, `offsets.json`, `SHA256SUMS`, auto-generated notes. Uses `GITHUB_TOKEN`.
-* Version = `git describe`, shown in the boot log and the menu About item.
+* Every push/PR: host tests → firmware at the pinned IDF (cached `~/.espressif`) in two
+  variants, `release` and `stats` (per-second statistics log, version suffixed `-stats`) →
+  SRAM headroom check → packaged artifacts. A drift check fails if `idf-ref` ≠ the ESP-SDR
+  C5 pin in the submodule.
+* Tag `v*`: GitHub Release with `t-sdr-c5-<ver>-merged.bin` (flash at `0x0`), the separate
+  images + `flash_args` + `offsets.json` (tar.gz), `SHA256SUMS`, generated notes. Never tag a
+  `[skip ci]` commit (GitHub skips the tag's run too).
+* Then the `pages` job publishes the browser flasher (`web/index.html`, esptool-js 0.7.0)
+  with every release; a manual run on a branch redeploys it.
+* Version = `git describe`, shown in the boot log and the menu's About item.
 
 ## 8. README outline
 
@@ -250,32 +272,33 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | M1 | Repo skeleton, CI, release pipeline, board bring-up, radio capture → one spectrum line — **done** | — |
 | M2 | Channel view MVP: waterfall, spectrum, status, channel/band buttons, NVS — **done, verified on HW** | `v0.1.0` ✅ |
 | M3 | Fast engine, `TUNEM`, auto-level gain, menu, brightness, battery % — **done, verified on HW** | `v0.2.0` ✅ |
-| M4 | Web flasher (ESP Web Tools on GitHub Pages, settings-preserving updates) — **done in v0.2.1**; band survey | `v0.3.0` |
+| M4 | Browser flasher (GitHub Pages; esptool-js, version selector, serial console, settings-preserving updates) — **done**; band survey; tuning by frequency — **on `main`, awaiting HW test** | `v0.3.0` |
 
 ## 10. Testing
 
-* Host: unit tests for channel↔frequency tables, bin→pixel mapping, dB/colour LUTs,
-  button gesture state machine (fed synthetic timings).
-* Device (you, with the board): checklist per release: boot, every channel on both
-  bands shows the expected traffic (e.g. your AP's channel), button gestures,
-  NVS restore, ≥ 20 lines/s shown in the status bar.
+* Host (`tests/host`, ASan/UBSan): FFT against a double-precision DFT, noise-floor accuracy
+  of the fixed-point path, block-scale normalisation, power codes, spectrum orientation,
+  line accumulation, survey plans and pixel mapping, passband flattening, tuning and
+  wrap-around, gestures, menu, auto-level, colour maps.
+* Device (the user, with the board): per release: boot, both views on both ranges,
+  button gestures, menu, settings restore, the stats build's log (lines/s, timing).
 
-## 11. Open risks and how we retire them
+## 11. Risks (all retired)
 
-| Risk | Retired by |
+| Risk | Outcome |
 |---|---|
-| SPI DMA / PSRAM disturb captures (or vice versa) | Spike: viewer CRC errors and screen artefacts while animating |
-| Static SRAM headroom too small | Measured: 30.8 KiB after mitigations (§1.1); CI gate at 8 KiB |
-| Wi-Fi `.bss` in PSRAM breaks the PHY debug path | Spike boots with it enabled; fallback: keep Wi-Fi `.bss` internal (we still have ≈ 20 KiB) |
-| Fast-engine port regressions | Keep stock `adctrig` as a compile-time fallback |
-| Panel at 80 MHz SPI | Try at bring-up; 40 MHz meets the targets anyway |
+| SPI DMA / PSRAM disturb captures (or vice versa) | Spike + firmware: 0 capture failures with the display running |
+| Static SRAM headroom too small | ≈30 KiB headroom; CI gate at 8 KiB |
+| Wi-Fi `.bss` in PSRAM breaks the PHY debug path | Works on hardware |
+| Fast-engine port regressions | 0 failures on hardware; stock `adctrig` kept behind `CONFIG_C5_RADIO_STOCK_CAPTURE` |
+| Panel at 80 MHz SPI | Not needed: 40 MHz meets the targets |
 
-## 12. Decisions (2026-10-16)
+## 12. Decisions
 
 | # | Decision | Choice |
 |---|---|---|
 | D1 | Radio code base | **Upstream ESP-SDR as a pinned submodule + ported ESPsoup fast capture engine and `TUNEM`** (attributed, GPL-3.0) |
-| D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press); in the menu B walks items and A changes values (user request after HW test: fewer hand movements) |
+| D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, now frequency steps per D6, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press); in the menu B walks items and A changes values (user request after HW test: fewer hand movements) |
 | D3 | USB host mode (ESPARGOS viewer compatible) | **Dropped** (2026-10-16): anyone who wants a USB SDR can flash ESP-SDR itself |
 | D4 | Language | **C++23 app/UI/DSP, C radio layer** |
 | D5 | Default view | Channel view, 80 MS/s capture, 40 MHz displayed span, peak detector |

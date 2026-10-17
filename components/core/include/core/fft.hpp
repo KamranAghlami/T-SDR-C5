@@ -10,10 +10,10 @@ namespace core
     // (N >= 8). Every stage halves the values (rounded), so the result is
     // DFT / N.
     //
-    // Inputs must stay within +-16383 per component (a complex magnitude of at
-    // most 23170): halving stages then can never overflow, which lets the
-    // butterflies run without saturation. Output is in natural order: bin 0 is
-    // DC, bin N/2 the Nyquist frequency.
+    // Inputs must stay within +-16384 per component (a complex magnitude of at
+    // most 23171): halving stages never raise the largest magnitude, and int16
+    // only overflows above 32767, so the butterflies run without saturation.
+    // Output is in natural order: bin 0 is DC, bin N/2 the Nyquist frequency.
     class fft_q15
     {
     public:

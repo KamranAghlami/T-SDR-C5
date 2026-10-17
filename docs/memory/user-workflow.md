@@ -19,3 +19,7 @@ purpose); prefers keeping the device UI minimal and to the point.
 
 Scope decisions: USB host mode (ESPARGOS viewer compatibility) dropped on
 2026-10-16 — "people can use their firmware if they want to".
+
+Product direction (2026-10-16): the gadget is a general receiver, not a Wi-Fi tool —
+tune by frequency (whole MHz, user step), full chip ranges, no channel numbers in the
+UI. Keep UI text minimal; the user notices cluttered labels and unthemed web UI.

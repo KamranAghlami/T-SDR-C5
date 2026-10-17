@@ -606,6 +606,12 @@ namespace
         CHECK(core::exp2_q8(-256) == 128);
         CHECK(core::log2_q8(1024) == 10 * 256);
 
+        // Largest results that fit, then saturation instead of wrapping.
+        CHECK(core::exp2_q8(22 * 256) == (1u << 30));
+        CHECK(core::exp2_q8(23 * 256 - 1) > (1u << 30));
+        CHECK(core::exp2_q8(23 * 256) == UINT32_MAX);
+        CHECK(core::exp2_q8(-40 * 256) == 0);
+
         for (int32_t x = -1024; x <= 1024; x += 37)
         {
             const double expected = 256.0 * std::exp2(x / 256.0);

@@ -28,5 +28,10 @@ logs `I phy: 0x3ff,0x40000,...` on every capture; silence the "phy" tag. M1 got
 - M3 timing on HW: capture 70 us, DSP 1446 us (FFT dominated: saturation
   branches), UI 3.5 ms/frame; 25 captures/line.
 
+- Band survey on hardware (2026-10-16/17): fast retune ~1.0 ms/step; every 40 MHz
+  capture shows a centre-heavy noise hump (passband) and residual DC at its centre,
+  hence the learned passband correction and centre-bin blanking. 5 GHz (incl.
+  UNII-3) receives fine through the Wi-Fi-driver PLL path.
+
 **Why:** these cost a hardware round-trip to learn. **How to apply:** keep them
-when touching board/ code; still to confirm: 5 GHz reception. See [[sram-budget]].
+when touching board/ code. See [[sram-budget]].
