@@ -1,6 +1,6 @@
 ---
 name: user-workflow
-description: How the user works on t-sdr-c5 and tests firmware
+description: How the user works on T-SDR-C5 and tests firmware
 metadata:
   type: user
 ---

@@ -1,4 +1,4 @@
-menu "t-sdr-c5 radio"
+menu "T-SDR-C5 radio"
 
     config C5_RADIO_STOCK_CAPTURE
         bool "Use the vendor adctrig() capture path"

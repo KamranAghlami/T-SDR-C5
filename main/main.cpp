@@ -27,7 +27,7 @@
 
 namespace
 {
-    constexpr const char *tag = "t-sdr-c5";
+    constexpr const char *tag = "T-SDR-C5";
     constexpr int64_t line_period_us = 40'000; // 25 waterfall lines per second
     constexpr int64_t idle_refresh_us = 200'000;
     constexpr int64_t save_delay_us = 2'000'000;
@@ -426,7 +426,7 @@ extern "C" void app_main(void)
 
     const char *version = esp_app_get_description()->version;
 
-    ESP_LOGI(tag, "t-sdr-c5 %s", version);
+    ESP_LOGI(tag, "T-SDR-C5 %s", version);
     // The vendor PHY code logs per capture/retune; that also costs time.
     esp_log_level_set("phy", ESP_LOG_WARN);
 

@@ -1,23 +1,23 @@
-# t-sdr-c5
+# T-SDR-C5
 
 **A pocket Wi-Fi spectrum waterfall for the LilyGO T-Display-C5.**
 
 The ESP32-C5 has a dual-band (2.4 + 5 GHz) Wi-Fi radio. ESP-SDR found an
 undocumented debug path that delivers its raw I/Q samples to the CPU.
-t-sdr-c5 runs FFTs on the chip itself and draws a live spectrum and waterfall
+T-SDR-C5 runs FFTs on the chip itself and draws a live spectrum and waterfall
 anywhere from 2130 to 2730 MHz and from 4790 to 5990 MHz on the board's 1.9" screen:
 Wi-Fi, the 13 cm amateur band, 5.8 GHz FPV video and more. It needs no PC,
 no SDR dongle and no extra hardware: just the board and its antenna.
 
-[![CI](https://github.com/KamranAghlami/t-sdr-c5/actions/workflows/ci.yml/badge.svg)](https://github.com/KamranAghlami/t-sdr-c5/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/KamranAghlami/t-sdr-c5?include_prereleases)](https://github.com/KamranAghlami/t-sdr-c5/releases)
+[![CI](https://github.com/KamranAghlami/T-SDR-C5/actions/workflows/ci.yml/badge.svg)](https://github.com/KamranAghlami/T-SDR-C5/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/KamranAghlami/T-SDR-C5?include_prereleases)](https://github.com/KamranAghlami/T-SDR-C5/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-0a6fd6)](https://kamranaghlami.github.io/t-sdr-c5/)
+[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-0a6fd6)](https://kamranaghlami.github.io/T-SDR-C5/)
 
-> **Status:** [v0.2.0](https://github.com/KamranAghlami/t-sdr-c5/releases/latest) is the full channel
-> view (fast capture, upper-5 GHz tuning, auto-level gain, settings menu, battery), verified on
-> hardware. `main` adds the band survey and tuning by frequency. Flash it [from the browser](https://kamranaghlami.github.io/t-sdr-c5/). A band-survey view is
-> next; see [the milestones](docs/SPEC.md#9-milestones).
+> **Status:** [v0.2.x](https://github.com/KamranAghlami/T-SDR-C5/releases/latest) is the detail view (fast
+> capture, upper-5 GHz tuning, auto-level gain, settings menu, battery), verified on hardware.
+> `main` adds the band survey and tuning by frequency. Flash it
+> [from the browser](https://kamranaghlami.github.io/T-SDR-C5/).
 
 ## Features
 
@@ -37,7 +37,7 @@ no SDR dongle and no extra hardware: just the board and its antenna.
 - Remembers the range, the frequency per range and all settings across power cycles.
 
 Want the board as a USB SDR for a PC instead? Flash [ESP-SDR](https://github.com/ESPARGOS/esp-sdr)
-itself and use its browser viewer. t-sdr-c5 is the standalone counterpart.
+itself and use its browser viewer. T-SDR-C5 is the standalone counterpart.
 - **Receive-only.** The firmware never transmits on purpose (see [Limitations](#limitations)).
 
 ## Hardware
@@ -53,21 +53,21 @@ The touch variant works too; touch is not used.
 
 ## Flashing
 
-**Easiest: [flash it from your browser](https://kamranaghlami.github.io/t-sdr-c5/)** in Chrome, Edge
+**Easiest: [flash it from your browser](https://kamranaghlami.github.io/T-SDR-C5/)** in Chrome, Edge
 or Opera on a desktop. Plug the board in, pick a version (the latest is preselected), click
 *Install* and pick its serial port. Updating this way keeps your settings.
 
 Without Web Serial, use esptool and the release image:
 
-1. Download `t-sdr-c5-<version>-merged.bin` from the
-   [latest release](https://github.com/KamranAghlami/t-sdr-c5/releases/latest).
+1. Download `T-SDR-C5-<version>-merged.bin` from the
+   [latest release](https://github.com/KamranAghlami/T-SDR-C5/releases/latest).
 2. Flash it at offset **`0x0`**:
    ```sh
-   pipx run esptool --chip esp32c5 -p /dev/ttyACM0 write-flash 0x0 t-sdr-c5-<version>-merged.bin
+   pipx run esptool --chip esp32c5 -p /dev/ttyACM0 write-flash 0x0 T-SDR-C5-<version>-merged.bin
    ```
    The merged image also overwrites the settings area, which suits a fresh install. To update and keep
    your settings, flash the separate images from the release archive instead:
-   `write-flash 0x2000 bootloader.bin 0x8000 partition-table.bin 0x10000 t_sdr_c5.bin`
+   `write-flash 0x2000 bootloader.bin 0x8000 partition-table.bin 0x10000 T-SDR-C5.bin`
    (offsets are in `flash_args` / `offsets.json`).
 3. If the board doesn't enter download mode, hold **BOOT**, tap **RST**, then release **BOOT**.
 
@@ -219,11 +219,11 @@ To build locally you need the **exact ESP-IDF commit in [`idf-ref`](idf-ref)**. 
 ESP-SDR's C5 pin, because the receiver depends on private PHY internals of that SDK.
 
 ```sh
-git clone --recurse-submodules https://github.com/KamranAghlami/t-sdr-c5
+git clone --recurse-submodules https://github.com/KamranAghlami/T-SDR-C5
 git clone https://github.com/espressif/esp-idf ~/esp-idf-c5
-git -C ~/esp-idf-c5 checkout "$(cat t-sdr-c5/idf-ref)" && git -C ~/esp-idf-c5 submodule update --init --recursive
+git -C ~/esp-idf-c5 checkout "$(cat T-SDR-C5/idf-ref)" && git -C ~/esp-idf-c5 submodule update --init --recursive
 ~/esp-idf-c5/install.sh esp32c5 && . ~/esp-idf-c5/export.sh
-cd t-sdr-c5 && idf.py build flash monitor
+cd T-SDR-C5 && idf.py build flash monitor
 ```
 
 Host tests (no ESP-IDF needed):

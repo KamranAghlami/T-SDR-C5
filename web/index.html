@@ -6,7 +6,7 @@
   <!-- Native controls (select popup, checkboxes, scrollbars) follow the theme too. -->
   <meta name="color-scheme" content="light dark">
   <title>T-SDR-C5 Flasher</title>
-  <meta name="description" content="Install the t-sdr-c5 Wi-Fi waterfall firmware on a LilyGO T-Display-C5 from your browser.">
+  <meta name="description" content="Install the T-SDR-C5 Wi-Fi waterfall firmware on a LilyGO T-Display-C5 from your browser.">
   <style>
     :root {
       color-scheme: light dark;
@@ -94,12 +94,12 @@
 </head>
 <body>
 <main>
-  <h1>t-sdr-c5</h1>
+  <h1>T-SDR-C5</h1>
   <p class="lede">A pocket Wi-Fi spectrum waterfall for the LilyGO T-Display-C5. Install it from your browser.</p>
 
   <div class="warn" id="unsupported" hidden>
     This browser can't talk to serial devices. Use Chrome, Edge or Opera on a desktop computer, or flash
-    <a href="https://github.com/KamranAghlami/t-sdr-c5/releases/latest">the release image</a> with esptool.
+    <a href="https://github.com/KamranAghlami/T-SDR-C5/releases/latest">the release image</a> with esptool.
   </div>
 
   <section class="card" aria-labelledby="install-title">
@@ -108,7 +108,7 @@
     <div class="stack">
       <label for="version">Version</label>
       <select id="version" disabled><option>Loading releases…</option></select>
-      <a id="notes" href="https://github.com/KamranAghlami/t-sdr-c5/releases">Release notes</a>
+      <a id="notes" href="https://github.com/KamranAghlami/T-SDR-C5/releases">Release notes</a>
     </div>
     <label class="check"><input type="checkbox" id="erase"> Erase the board first (clean install, resets settings)</label>
     <div class="row">
@@ -141,14 +141,14 @@
       <li>Choose the board's port when asked (often "USB JTAG/serial debug unit").</li>
       <li>Installing without erasing keeps your band, channel and settings.</li>
       <li>If the board isn't found, hold <b>BOOT</b>, tap <b>RST</b>, release <b>BOOT</b> and try again.</li>
-      <li>Usage is explained in the <a href="https://github.com/KamranAghlami/t-sdr-c5#using-it">README</a>.</li>
+      <li>Usage is explained in the <a href="https://github.com/KamranAghlami/T-SDR-C5#using-it">README</a>.</li>
     </ol>
   </section>
 
   <footer>
     Receive-only firmware built on <a href="https://github.com/ESPARGOS/esp-sdr">ESP-SDR</a>; flashing by
     <a href="https://github.com/espressif/esptool-js">esptool-js</a>.
-    <a href="https://github.com/KamranAghlami/t-sdr-c5">Source (GPL-3.0)</a>.
+    <a href="https://github.com/KamranAghlami/T-SDR-C5">Source (GPL-3.0)</a>.
   </footer>
 </main>
 
@@ -163,7 +163,7 @@
   const supported = 'serial' in navigator;
 
   // ---- versions --------------------------------------------------------------
-  const releaseUrl = (v) => `https://github.com/KamranAghlami/t-sdr-c5/releases/tag/${encodeURIComponent(v)}`;
+  const releaseUrl = (v) => `https://github.com/KamranAghlami/T-SDR-C5/releases/tag/${encodeURIComponent(v)}`;
 
   function choose(version) {
     notes.href = releaseUrl(version);
@@ -249,7 +249,7 @@
       const chip = await loader.main();
 
       if (loader.chip.CHIP_NAME !== 'ESP32-C5')
-        throw new Error(`This board is an ${loader.chip.CHIP_NAME}; t-sdr-c5 needs an ESP32-C5 (T-Display-C5).`);
+        throw new Error(`This board is an ${loader.chip.CHIP_NAME}; T-SDR-C5 needs an ESP32-C5 (T-Display-C5).`);
 
       setStatus(erase.checked ? `Erasing and writing ${version}…` : `Writing ${version}…`);
       await loader.writeFlash({

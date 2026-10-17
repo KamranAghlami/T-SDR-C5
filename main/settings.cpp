@@ -9,6 +9,8 @@ namespace settings
 {
     namespace
     {
+        // Lowercase from before the project was renamed T-SDR-C5; changing it
+        // would orphan every board's saved settings.
         constexpr const char *nvs_namespace = "t-sdr-c5";
         constexpr const char *nvs_key = "state";
     }

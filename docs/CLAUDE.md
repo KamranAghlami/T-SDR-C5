@@ -1,4 +1,4 @@
-# t-sdr-c5 — notes for Claude
+# T-SDR-C5 — notes for Claude
 
 Handheld spectrum/waterfall for the LilyGO T-Display-C5 (ESP32-C5): a receive-only
 SDR on ESPARGOS/esp-sdr, tuned by frequency over 2130–2730 and 4790–5990 MHz,

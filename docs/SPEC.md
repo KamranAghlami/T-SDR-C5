@@ -1,4 +1,4 @@
-# t-sdr-c5 — Specification (v0.3)
+# T-SDR-C5 — Specification (v0.3)
 
 A pocket spectrum/waterfall gadget for the **LilyGO T-Display-C5**. It uses the
 ESP32-C5's own Wi-Fi radio as a receive-only SDR (the ESP-SDR raw-IQ debug
@@ -28,7 +28,7 @@ from that study; current measurements are in §5.2.
 | F7 | Capture overhead | Stock vendor `adctrig()` adds **≈1.7 ms per snapshot** (a bus-stalling register RMW). ESPsoup's register-level engine removes it (80 MS/s: 1886 → 206 µs). Without the port, the frame budget allows roughly 15 captures per line; with it, about 45. | ESPsoup §Measurements | ✅ (port the engine) |
 | F8 | Gapless capture? | Not at waterfall bandwidths. Dump-path continuous mode reaches 91–96 % coverage only at 4–10 MS/s, and only 16–46 % at 20 MS/s. The gapless 40 MS/s PARLIO path is 4+4-bit and needs 8 free GPIO pads toggling at 40 MHz. **Out of scope**: this is a *sampling* spectrum analyser, see §5.4. | ESPsoup §Continuous engine, §PARLIO | ⚠️ limitation, documented |
 | F9 | Toolchain | Must use the **exact ESP-IDF commit ESP-SDR pins for C5** (`25fe69f9…`, a 6.2-dev master commit). The receiver patches private `libphy` ABI offsets, so any other IDF (e.g. the `release-v6.1` Docker image) is unsafe. | `firmware-targets.json`, `rx_recalibration.c` | ✅ (pin + CI drift check) |
-| F10 | Licence | ESP-SDR is GPL-3.0-or-later. ESPsoup parts are GPL-3.0-or-later, with some possibly GPL-3.0-only (C5VRX-inspired). Distributing **t-sdr-c5 under GPL-3.0** is compatible. | NOTICE files | ✅ |
+| F10 | Licence | ESP-SDR is GPL-3.0-or-later. ESPsoup parts are GPL-3.0-or-later, with some possibly GPL-3.0-only (C5VRX-inspired). Distributing **T-SDR-C5 under GPL-3.0** is compatible. | NOTICE files | ✅ |
 
 ### 1.1 Memory headroom (CI, ESP-IDF `25fe69f9`)
 
@@ -44,7 +44,7 @@ Bank 0 is `0x40800000–0x4081FFFF`. Every static section has to end below the d
 Where the space goes:
 
 * **Upstream `spectrum.c`:** 26.6 KiB of static FFT buffers (`fft_data`, `powers`, `window`, `twiddles`, `frame`).
-  t-sdr-c5 doesn't link it and keeps its own DSP buffers on the heap.
+  T-SDR-C5 doesn't link it and keeps its own DSP buffers on the heap.
 * **PSRAM driver + SPI master ISR + cache/MMU code** add about 13.8 KiB of IRAM. Possible further
   savings: `CONFIG_SPI_MASTER_ISR_IN_IRAM=n` (≈2.6 KiB), dropping the UART bridge.
 * Wi-Fi `.bss` (`g_cnxMgr` 5.9 KiB, NAN/BTWT/NVS state) moves to PSRAM automatically with the option above.
@@ -224,7 +224,7 @@ hardware.
 ## 6. Software architecture
 
 ```
-t-sdr-c5/
+T-SDR-C5/
 ├─ third_party/esp-sdr/        git submodule, pinned (ESPARGOS/esp-sdr)
 ├─ components/
 │  ├─ c5_radio/                C: tune (normal + fast), gain, bandwidth, DC recal, capture
@@ -254,7 +254,7 @@ t-sdr-c5/
   variants, `release` and `stats` (per-second statistics log, version suffixed `-stats`) →
   SRAM headroom check → packaged artifacts. A drift check fails if `idf-ref` ≠ the ESP-SDR
   C5 pin in the submodule.
-* Tag `v*`: GitHub Release with `t-sdr-c5-<ver>-merged.bin` (flash at `0x0`), the separate
+* Tag `v*`: GitHub Release with `T-SDR-C5-<ver>-merged.bin` (flash at `0x0`), the separate
   images + `flash_args` + `offsets.json` (tar.gz), `SHA256SUMS`, generated notes. Never tag a
   `[skip ci]` commit (GitHub skips the tag's run too).
 * Then the `pages` job publishes the browser flasher (`web/index.html`, esptool-js 0.7.0)

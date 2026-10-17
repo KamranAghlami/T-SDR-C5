@@ -1,4 +1,4 @@
-menu "t-sdr-c5"
+menu "T-SDR-C5"
 
     config T_SDR_C5_STATS_LOG
         bool "Log capture statistics once per second"

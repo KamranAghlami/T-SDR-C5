@@ -2,8 +2,8 @@
 """Lay out every release for the browser flasher.
 
 Inputs: the JSON of `gh release list --json tagName,isPrerelease,isLatest,publishedAt`
-and a directory holding each release's extracted archive (t-sdr-c5-<tag>/ with
-offsets.json and the images). Output, under the site directory:
+and a directory holding each release's extracted archive (T-SDR-C5-<tag>/, or
+t-sdr-c5-<tag>/ for releases before the rename, with offsets.json and the images). Output, under the site directory:
 
   firmware/<tag>/*.bin     the images of each release
   manifests/<tag>.json     parts and offsets per release (ESP Web Tools format)
@@ -21,7 +21,7 @@ from pathlib import Path
 
 def manifest(version, offsets):
     return {
-        'name': 't-sdr-c5',
+        'name': 'T-SDR-C5',
         'version': version,
         'new_install_prompt_erase': True,
         'builds': [{
@@ -42,7 +42,8 @@ def main():
     versions = []
     for release in sorted(releases, key=lambda r: r['publishedAt'], reverse=True):
         tag = release['tagName']
-        source = args.archives / f't-sdr-c5-{tag}'
+        candidates = [args.archives / f'{name}-{tag}' for name in ('T-SDR-C5', 't-sdr-c5')]
+        source = next((c for c in candidates if (c / 'offsets.json').exists()), candidates[0])
         offsets_file = source / 'offsets.json'
         if not offsets_file.exists():
             print(f'skipping {tag}: no extracted archive')

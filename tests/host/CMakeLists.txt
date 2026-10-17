@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(t_sdr_c5_host_tests CXX)
+project(T-SDR-C5-host-tests CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
