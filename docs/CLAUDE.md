@@ -2,7 +2,7 @@
 
 Handheld spectrum/waterfall for the LilyGO T-Display-C5 (ESP32-C5): a receive-only
 SDR on ESPARGOS/esp-sdr, tuned by frequency over 2130–2730 and 4790–5990 MHz,
-with a channel view and a band-survey view. Specification: [SPEC.md](SPEC.md).
+with a detail view (around the tuned frequency) and a band-survey view. Specification: [SPEC.md](SPEC.md).
 
 ## Layout
 

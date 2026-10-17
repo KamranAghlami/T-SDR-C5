@@ -18,12 +18,12 @@ namespace core
         gain,
         colormap,
         brightness,
-        about,
+        version,
     };
 
     inline constexpr std::array<menu_item, 8> menu_items = {
         menu_item::view, menu_item::span,     menu_item::step,       menu_item::detector,
-        menu_item::gain, menu_item::colormap, menu_item::brightness, menu_item::about,
+        menu_item::gain, menu_item::colormap, menu_item::brightness, menu_item::version,
     };
 
     inline constexpr std::array<uint8_t, 5> brightness_levels = {20, 40, 60, 80, 100};

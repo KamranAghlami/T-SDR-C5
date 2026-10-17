@@ -129,7 +129,7 @@ namespace
             mhz = static_cast<uint16_t>(core::step_frequency(state.band, mhz, g == core::gesture::short_a ? -step : step));
             state.frozen = false;
             // In the band view this only moves the cursor; the sweep is unchanged.
-            e.retune = state.view == core::view_id::channel;
+            e.retune = state.view == core::view_id::detail;
             e.save = true;
             break;
         }

@@ -20,7 +20,7 @@
 //         6  colour map      0 = turbo, 1 = grey
 //         7  brightness %                          end of version 1 (8 bytes)
 //         8  gain            255 auto, 254 HW AGC, else manual index   (v2: 9)
-//         9  view            0 = channel, 1 = band                     (v3: 10)
+//         9  view            0 = detail, 1 = band                      (v3: 10)
 //     10-13  frequency MHz   per band, little-endian
 //        14  step MHz                                                  (v4: 15)
 namespace core::settings_codec

@@ -96,7 +96,7 @@ CI fails if headroom drops below 8 KiB.
 
 ### 3.2 Views
 
-**Channel view.** Centred on the tuned frequency:
+**Detail view.** Centred on the tuned frequency:
 
 * Capture: 80 MS/s, widest analog bandwidth (PHY mode 1, ≈48 MHz), 1024-point FFT, Hann
   window, mean removed per capture (DC/LO leakage).
@@ -113,8 +113,8 @@ CI fails if headroom drops below 8 KiB.
   offset from the quietest step of each line, smoothed over ≈16 lines and divided out
   (≤ ±12 dB). The 5 bins around each step's centre (DC/LO leakage) are skipped and their
   pixels filled from the neighbours.
-* Short A/B move a cursor by the Step; the axis bar shows the span the channel view would
-  display there, and switching View back to Channel opens it.
+* Short A/B move a cursor by the Step; the axis bar shows the span the detail view would
+  display there, and switching View back to Detail opens it.
 
 ### 3.3 Screen layout (320 × 170, landscape)
 
@@ -147,7 +147,7 @@ The menu (8 items) covers rows 16–169 while open.
 | A + B together | freeze / unfreeze (restarts the line) | close |
 
 No auto-repeat (a hold is a long press). Menu items: View, Span, Step, Detector, Gain
-(Auto / HW AGC / manual 8, 16, …), Colours, Bright, About (version).
+(Auto / HW AGC / manual 8, 16, …), Colours, Bright, Version.
 
 ### 3.5 Persistence and boot
 
@@ -155,7 +155,7 @@ View, range, frequency per range, span, step, detector, gain, colour map and bri
 are stored in NVS (layout v4), written 2 s after the last change to limit flash wear.
 Older layouts are read (v1–3 stored a Wi-Fi channel index, converted to its frequency).
 Boot: the panel is cleared with the backlight off while the radio initialises (≈1 s, no
-splash); the version is in the boot log and the menu's About item.
+splash); the version is in the boot log and the menu's Version item.
 
 ### 3.6 Gain
 
@@ -180,7 +180,7 @@ fast snapshot (80 MS/s × 1024 → SRAM bank 1, register-level engine)
 → prepare_iq: mean removal, Hann window, block scale (fills ±16384), bit-reversed order
 → FFT 1024 (Q15, no saturation): five radix-4 passes, the first multiply-free
 → |X|² normalised to a common scale → accumulate peak/mean
-   channel view: until the 40 ms line deadline; band view: per sweep step
+   detail view: until the 40 ms line deadline; band view: per sweep step
 → bins → 320 px, log (0.5 dB codes) → frame queue
 UI task (higher priority, blocks on SPI): waterfall ring (PSRAM) → 2 × 320×16 DMA bands
 ```
@@ -189,8 +189,8 @@ UI task (higher priority, blocks on SPI): waterfall ring (PSRAM) → 2 × 320×1
 
 | Metric | Target | Measured |
 |---|---|---|
-| Channel-view line rate | ≥ 20 lines/s | 25–26 |
-| Snapshots per line | ≥ 30 | 24–25 (channel view), ≈35 (2.4G band, older 3-step plan) |
+| Detail-view line rate | ≥ 20 lines/s | 25–26 |
+| Snapshots per line | ≥ 30 | 24–25 (detail view), ≈35 (2.4G band, older 3-step plan) |
 | Capture / DSP per snapshot | — | ≈70 µs / ≈1.0 ms with the radix-2 stages (1.45 ms before the saturation-free FFT); radix-4 expected ≈0.83 ms |
 | Band-view retune | — | ≈1.0 ms per step |
 | Band-view line rate | — | 24 (3 steps), 19 (19 steps); 15/30-step ranges ≈15–25 expected |
@@ -259,7 +259,7 @@ t-sdr-c5/
   `[skip ci]` commit (GitHub skips the tag's run too).
 * Then the `pages` job publishes the browser flasher (`web/index.html`, esptool-js 0.7.0)
   with every release; a manual run on a branch redeploys it.
-* Version = `git describe`, shown in the boot log and the menu's About item.
+* Version = `git describe`, shown in the boot log and the menu's Version item.
 
 ## 8. README outline
 
@@ -286,7 +286,7 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
   of the fixed-point path, block-scale normalisation, power codes, spectrum orientation,
   line accumulation, survey plans and pixel mapping, passband flattening, tuning and
   wrap-around, gestures, menu, auto-level, colour maps.
-* Device (the user, with the board): per release: boot, both views on both ranges,
+* Device (the user, with the board): per release: boot, both views (Detail, Band) on both ranges,
   button gestures, menu, settings restore, the stats build's log (lines/s, timing).
 
 ## 11. Risks (all retired)
@@ -307,6 +307,6 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 | D2 | Buttons | **Proposed scheme** of §3.4 (short A/B = channel −/+, now frequency steps per D6, long A = band, long B = menu, A+B = freeze); auto-repeat dropped (it conflicted with long press); in the menu B walks items and A changes values (user request after HW test: fewer hand movements) |
 | D3 | USB host mode (ESPARGOS viewer compatible) | **Dropped** (2026-10-16): anyone who wants a USB SDR can flash ESP-SDR itself |
 | D4 | Language | **C++23 app/UI/DSP, C radio layer** |
-| D5 | Default view | Channel view, 80 MS/s capture, 40 MHz displayed span, peak detector |
+| D5 | Default view | Detail view (first called "channel view"), 80 MS/s capture, 40 MHz displayed span, peak detector |
 | D6 | Tuning (2026-10-16) | **By frequency, not Wi-Fi channel**: ranges 2130–2730 / 4790–5990 MHz (ESPsoup's exact-tuning limits), Step 1/5/10/20 MHz in the menu; band view = whole range, cursor moves by the step; settings v4 migrates saved channels |
-| D7 | Band survey | Menu item View (A+B stays freeze); stitched 40 MHz steps, passband shape learned from the quietest step per offset and removed; centre bins blanked |
+| D7 | Band survey | Menu item View: Detail / Band (A+B stays freeze); menu "About" renamed "Version"; stitched 40 MHz steps, passband shape learned from the quietest step per offset and removed; centre bins blanked |

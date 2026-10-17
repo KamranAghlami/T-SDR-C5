@@ -33,7 +33,7 @@ esp_err_t c5_radio_tune(unsigned mhz);
 unsigned c5_radio_frequency(void);
 
 /* Retune without measuring DC at the new LO (band survey steps). Faster than
- * c5_radio_tune(); use c5_radio_tune() again to return to one channel. */
+ * c5_radio_tune(); use c5_radio_tune() again to stay on one frequency. */
 esp_err_t c5_radio_tune_fast(unsigned mhz);
 
 /* Hardware AGC (default), or a fixed PHY gain-table index (not dB). */

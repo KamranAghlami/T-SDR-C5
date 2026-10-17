@@ -38,8 +38,8 @@ namespace core
             return "Colours";
         case menu_item::brightness:
             return "Bright";
-        case menu_item::about:
-            return "About";
+        case menu_item::version:
+            return "Version";
         }
 
         return "";
@@ -50,7 +50,7 @@ namespace core
         switch (item)
         {
         case menu_item::view:
-            s.view = s.view == view_id::channel ? view_id::band : view_id::channel;
+            s.view = s.view == view_id::detail ? view_id::band : view_id::detail;
             return true;
 
         case menu_item::span:
@@ -89,7 +89,7 @@ namespace core
             s.brightness = next_in(brightness_levels, s.brightness);
             return true;
 
-        case menu_item::about:
+        case menu_item::version:
             return false;
         }
 
@@ -101,7 +101,7 @@ namespace core
         switch (item)
         {
         case menu_item::view:
-            std::snprintf(out, size, "%s", s.view == view_id::channel ? "Channel" : "Band");
+            std::snprintf(out, size, "%s", s.view == view_id::detail ? "Detail" : "Band");
             break;
 
         case menu_item::span:
@@ -136,7 +136,7 @@ namespace core
             std::snprintf(out, size, "%u%%", s.brightness);
             break;
 
-        case menu_item::about:
+        case menu_item::version:
             std::snprintf(out, size, "%s", version ? version : "");
             break;
         }

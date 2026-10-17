@@ -128,7 +128,7 @@ namespace ui
         // changing it, so the waterfall survives cursor moves.
         const uint32_t mapping = band_view ? 0x80000000u | static_cast<uint32_t>(f.state.band)
                                            : (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
-        // The axis also shows the cursor and the channel-view span.
+        // The axis also shows the cursor and the detail view's span.
         const uint32_t axis = (static_cast<uint32_t>(mhz) << 8) | f.state.span_mhz;
 
         if (mapping != m_mapping)
@@ -303,7 +303,7 @@ namespace ui
         if (state.view == core::view_id::band)
             build_band_axis(state.band, state.current_mhz(), state.span_mhz);
         else
-            build_channel_axis(state.current_mhz(), state.span_mhz);
+            build_detail_axis(state.current_mhz(), state.span_mhz);
     }
 
     // MHz labels at round frequencies. The bar on top marks [low, high).
@@ -346,12 +346,12 @@ namespace ui
         }
     }
 
-    void renderer::build_channel_axis(unsigned centre_mhz, unsigned span_mhz)
+    void renderer::build_detail_axis(unsigned centre_mhz, unsigned span_mhz)
     {
         const int centre = static_cast<int>(centre_mhz), span = static_cast<int>(span_mhz);
         const int label_step = span <= 20 ? 5 : span <= 40 ? 10 : 20;
 
-        // The bar marks a 20 MHz channel's width around the centre.
+        // The bar marks 20 MHz around the centre (a Wi-Fi channel's width).
         draw_axis(centre - span / 2, centre + span / 2, label_step, centre - 10, centre + 10, centre);
     }
 
@@ -361,7 +361,7 @@ namespace ui
         const int span = range.high_mhz - range.low_mhz;
         const int cursor = static_cast<int>(cursor_mhz), half = static_cast<int>(span_mhz) / 2;
 
-        // The bar marks what the channel view would show at the cursor.
+        // The bar marks what the detail view would show at the cursor.
         draw_axis(range.low_mhz, range.high_mhz, span > 800 ? 200 : 100, cursor - half, cursor + half, cursor);
     }
 }

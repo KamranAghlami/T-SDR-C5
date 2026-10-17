@@ -89,26 +89,27 @@ automatically.
 
 | Item | Values |
 |---|---|
-| View | Channel (around one frequency) / Band (the whole range) |
+| View | Detail (around the tuned frequency) / Band (the whole range) |
 | Span | 20 / 40 / 80 MHz |
 | Step | 1 / 5 (default) / 10 / 20 MHz per press |
 | Detector | Peak (default) / Mean |
 | Gain | Auto (auto-level) / HW AGC / manual 8, 16, … |
 | Colours | Turbo / Grey |
 | Bright | 20 … 100 % |
-| About | firmware version |
+| Version | firmware version |
 
 ### Settings explained
 
 Each waterfall line is built from around 30 short snapshots of the radio (12.8 µs each) taken
 during its 40 ms. Most settings change how those snapshots turn into pixels.
 
-**View: Channel / Band.** *Channel* shows the span around the tuned frequency in detail. *Band*
+**View: Detail / Band.** *Detail* shows the span around the tuned frequency. *Band*
 sweeps the whole range in 40 MHz steps and stitches them into one line: 15 steps for 2130–2730 MHz,
 30 for 4790–5990 MHz (about 1 ms per retune, so roughly 15–25 lines/s). The bar on the band view's
-axis marks what the channel view would show; switch back to *Channel* to look there in detail. Every 40 MHz capture passes noise
-more strongly at its centre than at its edges. The band view learns that shape from the quietest steps
-and divides it out, so for about a second after switching ranges the floor can look uneven.
+axis marks what the detail view would show; switch back to *Detail* to look there closely.
+Every 40 MHz capture passes noise more strongly at its centre than at its edges. The band view
+learns that shape from the quietest steps and divides it out, so for about a second after
+switching ranges the floor can look uneven.
 
 **Span: 20 / 40 / 80 MHz.** How much spectrum the 320-pixel width covers, centred on the tuned
 frequency.
@@ -150,7 +151,7 @@ about 40 dB above it. The floor is tracked automatically, so these are relative 
 
 **Bright: 20–100 %.** Backlight level. Lower values save battery.
 
-**About.** The firmware version. Nothing to change.
+**Version.** The firmware version. Nothing to change.
 
 ```
 ┌──────────────────────────────────────────────┐

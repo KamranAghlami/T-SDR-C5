@@ -439,11 +439,14 @@ namespace
         core::state s;
         char value[24];
 
+        core::menu_value(s, core::menu_item::view, value, sizeof(value), nullptr);
+        CHECK(std::string(value) == "Detail");
+        CHECK(std::string(core::menu_label(core::menu_item::version)) == "Version");
         CHECK(core::menu_change(s, core::menu_item::view, 80) && s.view == core::view_id::band);
         CHECK(!core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 40);
         core::menu_value(s, core::menu_item::span, value, sizeof(value), nullptr);
         CHECK(std::string(value) == "Whole band");
-        CHECK(core::menu_change(s, core::menu_item::view, 80) && s.view == core::view_id::channel);
+        CHECK(core::menu_change(s, core::menu_item::view, 80) && s.view == core::view_id::detail);
         CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 80);
         CHECK(core::menu_change(s, core::menu_item::span, 80) && s.span_mhz == 20);
 
@@ -474,8 +477,8 @@ namespace
         core::menu_change(s, core::menu_item::brightness, 80);
         CHECK(s.brightness == 20);
 
-        CHECK(!core::menu_change(s, core::menu_item::about, 80));
-        core::menu_value(s, core::menu_item::about, value, sizeof(value), "v1.2.3");
+        CHECK(!core::menu_change(s, core::menu_item::version, 80));
+        core::menu_value(s, core::menu_item::version, value, sizeof(value), "v1.2.3");
         CHECK(std::string(value) == "v1.2.3");
 
         for (auto item : core::menu_items)

@@ -50,7 +50,7 @@ namespace core
 
     enum class view_id : uint8_t
     {
-        channel, // one channel, 20/40/80 MHz span
+        detail, // around the tuned frequency, 20/40/80 MHz span
         band,    // the whole band, stitched from several captures
     };
 
@@ -63,7 +63,7 @@ namespace core
     // Everything the user can change; owned by the control loop.
     struct state
     {
-        core::view_id view = core::view_id::channel;
+        core::view_id view = core::view_id::detail;
         core::band band = core::band::ghz24;
         // Tuned frequency per band; in the band view it is the cursor.
         std::array<uint16_t, 2> frequency_mhz = {2437, 5180};

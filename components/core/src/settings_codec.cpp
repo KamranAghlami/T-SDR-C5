@@ -106,7 +106,7 @@ namespace core::settings_codec
             s.gain = blob[at_gain];
 
         if (v >= 3)
-            s.view = blob[at_view] ? view_id::band : view_id::channel;
+            s.view = blob[at_view] ? view_id::band : view_id::detail;
 
         if (v >= 4 && contains(steps_mhz, blob[at_step]))
             s.step_mhz = blob[at_step];
