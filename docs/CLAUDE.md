@@ -40,3 +40,7 @@ with a detail view (around the tuned frequency) and a band-survey view. Specific
   captures/line, per-phase timing, battery) build with
   `CONFIG_T_SDR_C5_STATS_LOG=y` and `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` (the
   release WARN level compiles INFO out). CI's `firmware-stats` artifact is that build.
+- The project is named T-SDR-C5 (renamed from t-sdr-c5 on 2026-10-17). Keep the
+  NVS namespace `t-sdr-c5` (renaming it orphans saved settings) and the
+  `CONFIG_T_SDR_C5_*` symbols. The flasher site also reads pre-rename release
+  archives (`t-sdr-c5-<tag>.tar.gz`).
