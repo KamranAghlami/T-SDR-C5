@@ -9,7 +9,8 @@ with a channel view and a band-survey view. Specification: [SPEC.md](SPEC.md).
 - `components/c5_radio` (C): tune/gain/bandwidth/capture; compiles upstream
   calibration sources straight from `third_party/esp-sdr` (pinned submodule).
 - `components/core` (C++23, no ESP-IDF APIs): state/tuning ranges, gestures,
-  FFT, spectrum line, band survey (passband learning), menu, gain, colour maps.
+  FFT (radix-4), spectrum line, band survey (passband learning), menu, gain,
+  colour maps, settings blob layout (`settings_codec`: append-only, versioned).
   Also built by `tests/host` (ASan/UBSan) — test changes there first.
 - `components/board` (C++): LCD, backlight, buttons. `components/ui`: renderer.
 - `main`: control/radio loop (prio 4) + UI task (prio 5, blocks on SPI).

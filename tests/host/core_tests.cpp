@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <cstddef>
+#include <cstring>
 #include <cstdio>
 #include <numbers>
 #include <string>
@@ -14,6 +16,7 @@
 #include "core/gain.hpp"
 #include "core/gestures.hpp"
 #include "core/menu.hpp"
+#include "core/settings_codec.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
 #include "core/survey.hpp"
@@ -63,39 +66,43 @@ namespace
         return best;
     }
 
+    // Even and odd stage counts (radix-4 passes, plus a radix-2 stage when odd).
     void test_fft_matches_dft()
     {
-        constexpr unsigned log2n = 8, n = 1u << log2n;
-        const core::fft_q15 fft(log2n);
-        std::vector<int16_t> x(2 * n);
-        std::vector<std::complex<double>> input(n);
-
-        // Two tones plus an offset.
-        for (unsigned j = 0; j < n; j++)
+        for (const unsigned log2n : {2u, 3u, 8u, 9u, 10u})
         {
-            input[j] = 9000.0 * std::polar(1.0, 2 * pi * 13 * j / n) + 4000.0 * std::polar(1.0, -2 * pi * 70.5 * j / n) +
-                       std::complex<double>(1200, -800);
-            x[2 * j] = static_cast<int16_t>(std::lround(input[j].real()));
-            x[2 * j + 1] = static_cast<int16_t>(std::lround(input[j].imag()));
-        }
+            const unsigned n = 1u << log2n;
+            const core::fft_q15 fft(log2n);
+            std::vector<int16_t> x(2 * n);
+            std::vector<std::complex<double>> input(n);
 
-        fft.forward(x.data());
-
-        double worst = 0;
-
-        for (unsigned k = 0; k < n; k++)
-        {
-            std::complex<double> sum;
-
+            // Two tones plus an offset, within the FFT's input range.
             for (unsigned j = 0; j < n; j++)
-                sum += input[j] * std::polar(1.0, -2 * pi * k * j / n);
+            {
+                input[j] = 9000.0 * std::polar(1.0, 2 * pi * (n / 20 + 1) * j / n) +
+                           4000.0 * std::polar(1.0, -2 * pi * (n * 0.27 + 0.5) * j / n) + std::complex<double>(1200, -800);
+                x[2 * j] = static_cast<int16_t>(std::lround(input[j].real()));
+                x[2 * j + 1] = static_cast<int16_t>(std::lround(input[j].imag()));
+            }
 
-            sum /= n;
-            worst = std::max(worst, std::abs(sum - std::complex<double>(x[2 * k], x[2 * k + 1])));
+            fft.forward(x.data());
+
+            double worst = 0;
+
+            for (unsigned k = 0; k < n; k++)
+            {
+                std::complex<double> sum;
+
+                for (unsigned j = 0; j < n; j++)
+                    sum += input[j] * std::polar(1.0, -2 * pi * k * j / n);
+
+                sum /= n;
+                worst = std::max(worst, std::abs(sum - std::complex<double>(x[2 * k], x[2 * k + 1])));
+            }
+
+            std::printf("fft %4u: worst bin error %.2f LSB\n", n, worst);
+            CHECK(worst < 4.0);
         }
-
-        std::printf("fft: worst bin error %.2f LSB\n", worst);
-        CHECK(worst < 4.0);
     }
 
     void test_fft_full_scale_does_not_wrap()
@@ -620,6 +627,101 @@ namespace
         }
     }
 
+    bool same_settings(const core::state &a, const core::state &b)
+    {
+        return a.view == b.view && a.band == b.band && a.frequency_mhz == b.frequency_mhz && a.span_mhz == b.span_mhz &&
+               a.step_mhz == b.step_mhz && a.detector == b.detector && a.colormap == b.colormap &&
+               a.brightness == b.brightness && a.gain == b.gain;
+    }
+
+    void test_settings_codec()
+    {
+        namespace codec = core::settings_codec;
+        const core::state defaults;
+
+        // Round trip with every field away from its default.
+        core::state s;
+
+        s.view = core::view_id::band;
+        s.band = core::band::ghz5;
+        s.frequency_mhz = {2350, 5805};
+        s.span_mhz = 80;
+        s.step_mhz = 20;
+        s.detector = core::detector::mean;
+        s.colormap = core::colormap_id::grayscale;
+        s.brightness = 40;
+        s.gain = 32;
+        s.frozen = true; // not persisted
+
+        const auto blob = codec::encode(s);
+        const auto back = codec::decode(blob);
+
+        CHECK(blob.size() == 15);
+        CHECK(back && same_settings(*back, s) && !back->frozen);
+
+        // Byte-identical to the struct the firmware wrote before the codec
+        // existed (main/settings.cpp up to 3e5e724), so saved settings survive.
+        struct legacy
+        {
+            uint8_t version, band, channel_index[2], span_mhz, detector, colormap, brightness, gain, view;
+            uint8_t frequency[2][2];
+            uint8_t step_mhz;
+        } const old = {4, 1, {0, 0}, 80, 1, 1, 40, 32, 1, {{2350 & 255, 2350 >> 8}, {5805 & 255, 5805 >> 8}}, 20};
+
+        static_assert(sizeof(legacy) == codec::size);
+        CHECK(std::memcmp(&old, blob.data(), sizeof(old)) == 0);
+
+        // Version 1 (8 bytes): Wi-Fi channel indexes become frequencies.
+        const uint8_t v1[] = {1, 1, 5, 20, 80, 1, 1, 60};
+        const auto from_v1 = codec::decode(v1);
+
+        CHECK(from_v1.has_value());
+        CHECK(from_v1->band == core::band::ghz5);
+        CHECK(from_v1->frequency_mhz[0] == 2437 && from_v1->frequency_mhz[1] == 5745); // ch 6, ch 149
+        CHECK(from_v1->span_mhz == 80 && from_v1->detector == core::detector::mean);
+        CHECK(from_v1->colormap == core::colormap_id::grayscale && from_v1->brightness == 60);
+        CHECK(from_v1->gain == defaults.gain && from_v1->view == defaults.view && from_v1->step_mhz == defaults.step_mhz);
+
+        // Versions 2 and 3 add gain, then view.
+        const uint8_t v2[] = {2, 0, 13, 0, 20, 0, 0, 80, 16};
+        const uint8_t v3[] = {3, 0, 13, 0, 20, 0, 0, 80, 16, 1};
+
+        CHECK(codec::decode(v2) && codec::decode(v2)->gain == 16 && codec::decode(v2)->frequency_mhz[0] == 2484);
+        CHECK(codec::decode(v3) && codec::decode(v3)->view == core::view_id::band);
+
+        // Unknown versions and sizes are rejected; nothing is half-applied.
+        const uint8_t future[16] = {5};
+        const uint8_t v4_short[10] = {4};
+        const uint8_t v0[8] = {0};
+
+        CHECK(!codec::decode({}));
+        CHECK(!codec::decode(future));
+        CHECK(!codec::decode(v4_short));
+        CHECK(!codec::decode(v0));
+        CHECK(!codec::decode(std::span(v1, 7)));
+
+        // Out-of-range values keep their defaults; brightness is clamped.
+        auto bad = codec::encode(s);
+
+        bad[10] = 2000 & 255; // 2000 MHz: below the 2.4G range
+        bad[11] = 2000 >> 8;
+        bad[4] = 30;  // not a span
+        bad[14] = 3;  // not a step
+        bad[7] = 250; // brightness
+
+        const auto sanitised = codec::decode(bad);
+
+        CHECK(sanitised.has_value());
+        CHECK(sanitised->frequency_mhz[0] == defaults.frequency_mhz[0] && sanitised->frequency_mhz[1] == 5805);
+        CHECK(sanitised->span_mhz == defaults.span_mhz && sanitised->step_mhz == defaults.step_mhz);
+        CHECK(sanitised->brightness == 100);
+
+        const uint8_t v1_bad_channel[] = {1, 0, 99, 99, 40, 0, 0, 0};
+        const auto from_bad = codec::decode(v1_bad_channel);
+
+        CHECK(from_bad && from_bad->frequency_mhz == defaults.frequency_mhz && from_bad->brightness == 10);
+    }
+
     void test_colormap()
     {
         // Turbo is blue at a quarter and red at the top; values are byte-swapped RGB565.
@@ -650,6 +752,7 @@ int main()
     test_survey_accumulator();
     test_survey_passband();
     test_exp2_log2();
+    test_settings_codec();
     test_colormap();
 
     std::printf(failures ? "%d FAILED\n" : "all passed\n", failures);

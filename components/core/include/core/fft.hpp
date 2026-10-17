@@ -6,9 +6,12 @@
 
 namespace core
 {
-    // In-place radix-2 decimation-in-time FFT on interleaved Q15 complex data
-    // (N >= 8). Every stage halves the values (rounded), so the result is
-    // DFT / N.
+    // In-place decimation-in-time FFT on interleaved Q15 complex data (N >= 4,
+    // a power of two). Input in bit-reversed order; stages are fused in pairs
+    // into radix-4 passes (3 complex multiplies per 4 points instead of 4, one
+    // pass over memory per two stages), with a final radix-2 stage when log2 N
+    // is odd. Every stage halves the values (rounded once per pass), so the
+    // result is DFT / N.
     //
     // Inputs must stay within +-16384 per component (a complex magnitude of at
     // most 23171): halving stages never raise the largest magnitude, and int16
@@ -33,7 +36,7 @@ namespace core
 
     private:
         unsigned m_n;
-        std::vector<int16_t> m_twiddles; // cos, -sin pairs for k < N/2
+        std::vector<int16_t> m_twiddles; // cos, -sin pairs of W^k for k < N (radix-4 uses up to 3k)
         std::vector<uint16_t> m_order;   // bit-reversed index of each sample
     };
 }

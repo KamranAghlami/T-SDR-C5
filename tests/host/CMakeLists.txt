@@ -12,6 +12,7 @@ add_executable(core_tests
     "${core}/src/gain.cpp"
     "${core}/src/gestures.cpp"
     "${core}/src/menu.cpp"
+    "${core}/src/settings_codec.cpp"
     "${core}/src/spectrum.cpp"
     "${core}/src/survey.cpp")
 target_include_directories(core_tests PRIVATE "${core}/include")

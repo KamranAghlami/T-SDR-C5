@@ -178,7 +178,7 @@ input, Wi-Fi/BLE connectivity (the radio is busy being an SDR).
 ```
 fast snapshot (80 MS/s × 1024 → SRAM bank 1, register-level engine)
 → prepare_iq: mean removal, Hann window, block scale (fills ±16384), bit-reversed order
-→ FFT 1024 (Q15, no saturation; stages 1–2 as one multiply-free radix-4 pass)
+→ FFT 1024 (Q15, no saturation): five radix-4 passes, the first multiply-free
 → |X|² normalised to a common scale → accumulate peak/mean
    channel view: until the 40 ms line deadline; band view: per sweep step
 → bins → 320 px, log (0.5 dB codes) → frame queue
@@ -191,14 +191,17 @@ UI task (higher priority, blocks on SPI): waterfall ring (PSRAM) → 2 × 320×1
 |---|---|---|
 | Channel-view line rate | ≥ 20 lines/s | 25–26 |
 | Snapshots per line | ≥ 30 | 24–25 (channel view), ≈35 (2.4G band, older 3-step plan) |
-| Capture / DSP per snapshot | — | ≈70 µs / ≈1.0 ms (was 1.45 ms before §5.1's FFT changes) |
+| Capture / DSP per snapshot | — | ≈70 µs / ≈1.0 ms with the radix-2 stages (1.45 ms before the saturation-free FFT); radix-4 expected ≈0.83 ms |
 | Band-view retune | — | ≈1.0 ms per step |
 | Band-view line rate | — | 24 (3 steps), 19 (19 steps); 15/30-step ranges ≈15–25 expected |
 | UI CPU per frame | — | ≈3.5 ms |
 | Noise-floor accuracy of the fixed-point path | — | within 0.02 dB of double precision, 0.5–50 LSB rms (host test) |
 
-The snapshot target is missed by a little: the FFT dominates. Further radix-4 stages
-would cut DSP time by roughly a third.
+The snapshot target is missed by a little. Per 1024-point capture the DSP was ≈210k
+instructions (FFT 148k, `prepare_iq` 47k, accumulation 15k); the radix-4 passes cut the FFT
+to ≈111k (RISC-V GCC: 92 instructions per 4 points over two stages instead of 4 × 32),
+about 17 % of the total, so ≈28–30 snapshots per line are expected. Still to measure on
+hardware.
 
 ### 5.3 Memory plan
 
@@ -228,7 +231,8 @@ t-sdr-c5/
 │  │                           (upstream calibration sources from the submodule, ported
 │  │                           ESPsoup engine & TUNEM; linker guard + --wrap options)
 │  ├─ core/                    C++23, no ESP-IDF APIs: state/tuning, gestures, FFT,
-│  │                           spectrum line, band survey, menu, gain, colour maps
+│  │                           spectrum line, band survey, menu, gain, colour maps,
+│  │                           settings layout (main/settings.cpp only does NVS I/O)
 │  ├─ board/                   C++: LCD (esp_lcd ST7789), backlight, buttons, battery
 │  └─ ui/                      C++: renderer (status, spectrum, axis, waterfall, menu)
 ├─ main/                       control/radio loop, UI task, settings (NVS)
@@ -276,7 +280,9 @@ Hero image/GIF · what it is · features · hardware & antenna · flash in 1 min
 
 ## 10. Testing
 
-* Host (`tests/host`, ASan/UBSan): FFT against a double-precision DFT, noise-floor accuracy
+* Host (`tests/host`, ASan/UBSan): FFT against a double-precision DFT (sizes 4–1024, odd and
+  even stage counts), settings layout (byte-identical to the original struct, versions 1–4,
+  rejection, sanitising), noise-floor accuracy
   of the fixed-point path, block-scale normalisation, power codes, spectrum orientation,
   line accumulation, survey plans and pixel mapping, passband flattening, tuning and
   wrap-around, gestures, menu, auto-level, colour maps.
