@@ -33,6 +33,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # esp32c5: LilyGO T-Display-C5 (published in releases); esp32s3: LilyGO T-Display-S3.
+        target: [esp32c5, esp32s3]
         # stats: the same firmware with the per-second statistics log, for measurements.
         variant: [release, stats]
     steps:
@@ -43,11 +45,13 @@ jobs:
 
       - name: Read pinned ESP-IDF commit
         id: idf
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           ref=$(tr -d '[:space:]' < idf-ref)
-          upstream=$(python3 -I -c 'import json,sys; print(next(p["idf_ref"] for p in json.load(open(sys.argv[1]))["profiles"] if p["id"]=="esp32c5"))' third_party/esp-sdr/firmware-targets.json)
+          upstream=$(python3 -I -c 'import json,sys; print(next(p["idf_ref"] for p in json.load(open(sys.argv[1]))["profiles"] if p["id"]==sys.argv[2]))' third_party/esp-sdr/firmware-targets.json "$TARGET")
           if [ "$ref" != "$upstream" ]; then
-            echo "::error file=idf-ref::idf-ref ($ref) differs from the ESP-SDR C5 pin ($upstream). The receiver relies on private PHY ABI offsets of that exact SDK."
+            echo "::error file=idf-ref::idf-ref ($ref) differs from the ESP-SDR $TARGET pin ($upstream). The receiver relies on private PHY ABI offsets of that exact SDK."
             exit 1
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
@@ -64,13 +68,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.espressif
-          key: idf-${{ runner.os }}-${{ steps.idf.outputs.ref }}-esp32c5
+          key: idf-${{ runner.os }}-${{ steps.idf.outputs.ref }}-${{ matrix.target }}
 
       - name: Install SDK tools
-        run: .esp-idf/install.sh esp32c5
+        run: .esp-idf/install.sh ${{ matrix.target }}
 
       - name: Build
         env:
+          TARGET: ${{ matrix.target }}
           VARIANT: ${{ matrix.variant }}
         run: |
           source .esp-idf/export.sh
@@ -82,17 +87,23 @@ jobs:
             defaults="$defaults;sdkconfig.stats"
             version="$version-stats" # shown in the boot log and the menu's About item
           fi
-          idf.py -B build -DSDKCONFIG_DEFAULTS="$defaults" -DPROJECT_VER="$version" build
+          idf.py -B build -DIDF_TARGET="$TARGET" -DSDKCONFIG_DEFAULTS="$defaults" -DPROJECT_VER="$version" build
           idf.py -B build merge-bin -o "$PWD/build/merged.bin"
 
       - name: Check SRAM headroom
+        # The S3 linker guard (components/s3_radio/sram_guard.ld) has ample room.
+        if: matrix.target == 'esp32c5'
         run: |
           source .esp-idf/export.sh
           python3 -I tools/headroom.py build/T-SDR-C5.elf --min-kib 8 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Package
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           version=$(git describe --tags --always --dirty)
+          # C5 names are what releases and the browser flasher expect.
+          [ "$TARGET" = esp32c5 ] || version="$version-$TARGET"
           out="dist/T-SDR-C5-$version"
           mkdir -p "$out"
           cp build/merged.bin "dist/T-SDR-C5-$version-merged.bin"
@@ -105,7 +116,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.variant == 'release' && 'firmware' || 'firmware-stats' }}
+          # Releases and the browser flasher take the C5 'firmware' artifact only.
+          name: ${{ matrix.variant == 'release' && 'firmware' || 'firmware-stats' }}${{ matrix.target != 'esp32c5' && format('-{0}', matrix.target) || '' }}
           path: dist/
           if-no-files-found: error
           retention-days: 30

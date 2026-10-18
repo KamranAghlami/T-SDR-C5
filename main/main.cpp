@@ -15,13 +15,14 @@
 #include "board/battery.hpp"
 #include "board/buttons.hpp"
 #include "board/lcd.hpp"
-#include "c5_radio.h"
+#include "board/pins.hpp"
 #include "core/fft.hpp"
 #include "core/gain.hpp"
 #include "core/menu.hpp"
 #include "core/spectrum.hpp"
 #include "core/state.hpp"
 #include "core/survey.hpp"
+#include "radio.hpp"
 #include "settings.hpp"
 #include "ui/renderer.hpp"
 
@@ -93,7 +94,7 @@ namespace
             {
                 const auto item = core::menu_items[state.menu_index];
 
-                if (core::menu_change(state, item, c5_radio_gain_max()))
+                if (core::menu_change(state, item, radio::gain_max()))
                 {
                     e.save = true;
                     e.respan = item == core::menu_item::span;
@@ -135,7 +136,12 @@ namespace
         }
 
         case core::gesture::long_a:
-            state.band = core::other(state.band);
+            // Single-band boards switch views instead.
+            if (board::dual_band)
+                state.band = core::other(state.band);
+            else
+                state.view = state.view == core::view_id::detail ? core::view_id::band : core::view_id::detail;
+
             state.frozen = false;
             e.retune = e.save = true;
             break;
@@ -160,16 +166,16 @@ namespace
     // Applies the gain setting; returns the (clamped) auto-level index.
     unsigned apply_gain(const core::state &state, unsigned auto_index)
     {
-        const unsigned max_gain = c5_radio_gain_max();
+        const unsigned max_gain = radio::gain_max();
 
         auto_index = std::min(auto_index, max_gain);
 
         if (state.gain == core::gain_agc)
-            c5_radio_gain_hardware();
+            radio::gain_hardware();
         else if (state.gain == core::gain_auto)
-            c5_radio_gain_manual(auto_index);
+            radio::gain_manual(auto_index);
         else
-            c5_radio_gain_manual(std::min<unsigned>(state.gain, max_gain));
+            radio::gain_manual(std::min<unsigned>(state.gain, max_gain));
 
         return auto_index;
     }
@@ -191,7 +197,7 @@ namespace
         lcd.set_backlight(state.brightness);
         f.version = version;
 
-        unsigned auto_gain = c5_radio_gain_max() * 3 / 4;
+        unsigned auto_gain = radio::gain_max() * 3 / 4;
         bool retune = true;
         int64_t next_line = 0, save_at = 0, rate_start = esp_timer_get_time(), last_frame = 0;
         unsigned lines = 0, line_peak = 0, second_peak = 0;
@@ -199,9 +205,9 @@ namespace
         uint64_t capture_cycles = 0, dsp_cycles = 0, tune_cycles = 0;
         unsigned timed = 0, tunes = 0;
         uint8_t gain = 0;
-        c5_radio_stats_t last_stats;
+        radio::stats last_stats;
 
-        c5_radio_get_stats(&last_stats);
+        radio::get_stats(&last_stats);
 
         for (;;)
         {
@@ -250,7 +256,7 @@ namespace
                 {
                     const unsigned mhz = state.current_mhz();
 
-                    if (c5_radio_tune(mhz) != ESP_OK)
+                    if (radio::tune(mhz) != ESP_OK)
                         ESP_LOGW(tag, "tune %u MHz failed", mhz);
                 }
 
@@ -292,7 +298,7 @@ namespace
                 const uint32_t *words;
                 const uint32_t t0 = stats_log ? esp_cpu_get_cycle_count() : 0;
 
-                if (c5_radio_capture(core::fft_size, C5_RATE_80M, &words, nullptr) != ESP_OK)
+                if (radio::capture(core::fft_size, &words) != ESP_OK)
                     return;
 
                 const uint32_t t1 = stats_log ? esp_cpu_get_cycle_count() : 0;
@@ -322,7 +328,7 @@ namespace
                     const uint32_t t0 = stats_log ? esp_cpu_get_cycle_count() : 0;
                     const int64_t step_end = esp_timer_get_time() + slice;
 
-                    c5_radio_tune_fast(plan.centres_mhz[step]);
+                    radio::tune_fast(plan.centres_mhz[step]);
 
                     if (stats_log)
                     {
@@ -362,12 +368,12 @@ namespace
 
             if (state.gain == core::gain_auto)
             {
-                const unsigned next = leveller.update(auto_gain, c5_radio_gain_max(), line_peak);
+                const unsigned next = leveller.update(auto_gain, radio::gain_max(), line_peak);
 
                 if (next != auto_gain)
                 {
                     auto_gain = next;
-                    c5_radio_gain_manual(auto_gain);
+                    radio::gain_manual(auto_gain);
                 }
             }
 
@@ -380,13 +386,13 @@ namespace
 
                 if (stats_log)
                 {
-                    c5_radio_stats_t stats;
+                    radio::stats stats;
                     constexpr unsigned mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
                     const auto per_capture_us = [&](uint64_t cycles) {
                         return static_cast<unsigned>(timed ? cycles / timed / mhz : 0);
                     };
 
-                    c5_radio_get_stats(&stats);
+                    radio::get_stats(&stats);
                     ESP_LOGI(tag,
                              "%u lines/s, %u captures/line (capture %u us, dsp %u us, tune %u us, ui %u us/frame), "
                              "%u failures, %u recalibrations, gain %u, peak %u, SRAM %u, battery %u mV %d mA",
@@ -442,15 +448,21 @@ extern "C" void app_main(void)
     if (battery.init() == ESP_OK)
         xTaskCreate(battery_task, "battery", 3072, nullptr, 2, nullptr);
     else
-        ESP_LOGW(tag, "no AXP2602 fuel gauge found");
+        ESP_LOGW(tag, "no battery monitor found");
 
     // Also initialises NVS, which settings::load() needs.
-    ESP_ERROR_CHECK(c5_radio_init());
-    ESP_ERROR_CHECK(c5_radio_bandwidth(0));
+    ESP_ERROR_CHECK(radio::init());
+    ESP_ERROR_CHECK(radio::bandwidth(0));
 
-    // The UI blocks on SPI most of the time; above the radio loop it can
-    // refill the next display band as soon as a transfer finishes.
+    // The UI blocks on the panel bus most of the time; above the radio loop it
+    // can refill the next display band as soon as a transfer finishes. On a
+    // dual-core chip it gets the second core; the radio loop stays on core 0
+    // with the Wi-Fi/PHY tasks.
+#if CONFIG_FREERTOS_NUMBER_OF_CORES > 1
+    xTaskCreatePinnedToCore(ui_task, "ui", 6144, nullptr, 5, nullptr, 1);
+#else
     xTaskCreate(ui_task, "ui", 6144, nullptr, 5, nullptr);
+#endif
     vTaskPrioritySet(nullptr, 4);
     radio_loop(version);
 }

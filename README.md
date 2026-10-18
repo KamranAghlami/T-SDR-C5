@@ -218,6 +218,33 @@ flowchart LR
 - Receive-only, but not RF-silent: the stock PHY start-up and background calibration
   can emit short internal calibration signals, as on any ESP32 Wi-Fi firmware.
 
+## T-Display-S3
+
+The same firmware also builds for the **[LilyGO T-Display-S3](https://github.com/Xinyuan-LilyGO/T-Display-S3)**
+(ESP32-S3R8, 16 MB flash, 8 MB octal PSRAM, the same 1.9" 170×320 ST7789 on an 8-bit parallel bus),
+using [ESP-SDR's S3 receiver](https://github.com/ESPARGOS/esp-sdr). The S3 radio is 2.4 GHz only, so:
+
+- One range, **2130–2730 MHz**. The S3 tunes 2210–2651 MHz directly and reaches below that through a
+  6/5 LO divider; above about 2650 MHz tuning is an untested attempt (see ESP-SDR's notes).
+- **A long** (BOOT) toggles the detail and band views instead of the range. Everything else is as above:
+  **A** is the `BOOT` button (IO0), **B** the other button (IO14).
+- The battery shows a percentage estimated from voltage only (no fuel gauge on this board), or `USB`.
+
+Measured on hardware: detail view 25 lines/s with about 44 snapshots per line, band view 21 lines/s,
+no capture failures. The S3 is dual-core: the radio loop keeps core 0, the UI gets core 1.
+
+Build it with the same pinned ESP-IDF (ESP-SDR pins the same commit for the S3), then flash:
+
+```sh
+~/esp-idf-c5/install.sh esp32s3 && . ~/esp-idf-c5/export.sh
+idf.py -B build-s3 -DIDF_TARGET=esp32s3 build
+idf.py -B build-s3 -p /dev/ttyACM0 flash
+```
+
+CI builds it as the `firmware-esp32s3` artifact (`T-SDR-C5-<version>-esp32s3-merged.bin`, flash at
+`0x0`). Releases and the browser flasher stay T-Display-C5 only. The S3 bootloader sits at `0x0`, not
+`0x2000`: for separate images use `write-flash 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 T-SDR-C5.bin`.
+
 ## Building
 
 Every build runs in GitHub Actions: host unit tests, the firmware build, an
@@ -240,9 +267,10 @@ Host tests (no ESP-IDF needed):
 cmake -S tests/host -B build-host && cmake --build build-host && ctest --test-dir build-host
 ```
 
-Layout: `components/c5_radio` (C, the ESP-SDR-derived receive path), `components/core`
-(pure C++ DSP and logic), `components/board` (LCD, buttons), `components/ui` (renderer),
-`main` (control loop). Project notes are in [`docs/`](docs).
+Layout: `components/c5_radio` and `components/s3_radio` (C, the ESP-SDR-derived receive paths,
+one per target), `components/core` (pure C++ DSP and logic), `components/board` (LCD, buttons,
+battery; per-board pins and drivers), `components/ui` (renderer), `main` (control loop; `radio.hpp`
+selects the receiver). Project notes are in [`docs/`](docs).
 
 ## Credits
 
