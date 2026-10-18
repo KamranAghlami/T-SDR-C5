@@ -11,7 +11,8 @@
 
 namespace board
 {
-    // ST7789 170x320 IPS panel, used in landscape as 320x170.
+    // ST7789 170x320 IPS panel, used in landscape as 320x170: SPI on the
+    // T-Display-C5 (lcd_spi.cpp), an 8-bit i80 bus on the T-Display-S3 (lcd_i80.cpp).
     class lcd
     {
     public:

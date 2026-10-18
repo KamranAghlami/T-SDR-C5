@@ -8,11 +8,16 @@ with a detail view (around the tuned frequency) and a band-survey view. Specific
 
 - `components/c5_radio` (C): tune/gain/bandwidth/capture; compiles upstream
   calibration sources straight from `third_party/esp-sdr` (pinned submodule).
+- `components/s3_radio` (C): the same interface for the T-Display-S3 build
+  (`idf.py -DIDF_TARGET=esp32s3`, `sdkconfig.defaults.esp32s3`); `main/radio.hpp`
+  picks the receiver for the target. See [S3 findings](memory/s3-findings.md).
 - `components/core` (C++23, no ESP-IDF APIs): state/tuning ranges, gestures,
   FFT (radix-4), spectrum line, band survey (passband learning), menu, gain,
   colour maps, settings blob layout (`settings_codec`: append-only, versioned).
   Also built by `tests/host` (ASan/UBSan) — test changes there first.
-- `components/board` (C++): LCD, backlight, buttons. `components/ui`: renderer.
+- `components/board` (C++): LCD, backlight, buttons, battery. Pins and the
+  LCD/battery drivers are per board (SPI + AXP2602 on the C5, i80 + ADC on the S3);
+  `board::dual_band` is false on the S3 (no 5 GHz). `components/ui`: renderer.
 - `main`: control/radio loop (prio 4) + UI task (prio 5, blocks on SPI).
 
 ## Rules

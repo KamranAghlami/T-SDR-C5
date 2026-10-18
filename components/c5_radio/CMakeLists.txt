@@ -1,9 +1,12 @@
+if(NOT IDF_TARGET STREQUAL "esp32c5")
+    # Receiver of the T-Display-C5 build only; main picks the one for the target.
+    idf_component_register()
+    return()
+endif()
+
 set(espsdr "${CMAKE_CURRENT_LIST_DIR}/../../third_party/esp-sdr/main")
 if(NOT EXISTS "${espsdr}/common/rx_recalibration.c")
     message(FATAL_ERROR "third_party/esp-sdr is missing: run git submodule update --init")
-endif()
-if(NOT IDF_TARGET STREQUAL "esp32c5")
-    message(FATAL_ERROR "c5_radio supports only esp32c5")
 endif()
 
 idf_component_register(

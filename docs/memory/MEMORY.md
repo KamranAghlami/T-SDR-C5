@@ -1,3 +1,4 @@
 - [Hardware findings](hardware-findings.md) — verified T-Display-C5 facts (panel RGB order, buttons, PSRAM)
 - [SRAM budget](sram-budget.md) — why bank 0 is tight and what was moved to PSRAM
 - [Working with the user](user-workflow.md) — how the user tests and what they expect
+- [S3 findings](s3-findings.md) — verified T-Display-S3 facts (RF dump read-back, panel, pins, timing)

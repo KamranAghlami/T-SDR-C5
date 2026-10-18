@@ -1,4 +1,5 @@
 # LilyGO T-Display-C5: ESP32-C5-WROOM-1U-N16R8 (16 MB flash, 8 MB quad PSRAM).
+# The T-Display-S3 build (idf.py set-target esp32s3) adds sdkconfig.defaults.esp32s3.
 CONFIG_IDF_TARGET="esp32c5"
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y

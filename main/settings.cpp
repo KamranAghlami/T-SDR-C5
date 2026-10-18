@@ -3,6 +3,7 @@
 
 #include <nvs.h>
 
+#include "board/pins.hpp"
 #include "core/settings_codec.hpp"
 
 namespace settings
@@ -29,7 +30,12 @@ namespace settings
 
         nvs_close(handle);
 
-        return read ? core::settings_codec::decode({blob, size}).value_or(core::state{}) : core::state{};
+        core::state state = read ? core::settings_codec::decode({blob, size}).value_or(core::state{}) : core::state{};
+
+        if (!board::dual_band)
+            state.band = core::band::ghz24;
+
+        return state;
     }
 
     void save(const core::state &state)
